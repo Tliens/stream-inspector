@@ -1,0 +1,1717 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stream Inspector — Online Live Stream Pull Debugger (HLS · HTTP-FLV · DASH · WebRTC)</title>
+<meta name="description" content="Free online live-stream pull (playback) debugger for developers: play and diagnose HLS/m3u8, LL-HLS, HTTP-FLV, MPEG-TS, DASH and WebRTC WHEP streams. Playlist & MPD parser, real-time bitrate/buffer/dropped-frames metrics, event logs, CORS & mixed-content checks, RTMP/RTSP command-line assist. 100% local.">
+<link rel="canonical" href="https://tliens.github.io/stream-inspector/">
+<link rel="alternate" hreflang="en" href="https://tliens.github.io/stream-inspector/?lang=en">
+<link rel="alternate" hreflang="zh" href="https://tliens.github.io/stream-inspector/?lang=zh">
+<link rel="alternate" hreflang="x-default" href="https://tliens.github.io/stream-inspector/">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Stream Inspector">
+<meta property="og:title" content="Stream Inspector — Online Live Stream Pull Debugger">
+<meta property="og:description" content="Play & debug HLS, HTTP-FLV, DASH and WebRTC streams in your browser: manifest parser, real-time metrics, event logs, CORS checks. Free & 100% local.">
+<meta property="og:url" content="https://tliens.github.io/stream-inspector/">
+<meta property="og:image" content="https://tliens.github.io/stream-inspector/og-image.png">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Stream Inspector — Online Live Stream Pull Debugger">
+<meta name="twitter:description" content="Debug HLS / HTTP-FLV / DASH / WebRTC pull streams in the browser. Manifest parser · metrics · logs · CORS checks.">
+<meta name="twitter:image" content="https://tliens.github.io/stream-inspector/og-image.png">
+<script>
+/* Set theme & lang before first paint to avoid FOUC */
+(function(){
+  try{
+    var q=new URLSearchParams(location.search), lang=q.get('lang');
+    if(!lang) lang=localStorage.getItem('si_lang')||((navigator.language||'').toLowerCase().startsWith('zh')?'zh':'en');
+    document.documentElement.lang=lang;
+    var th=localStorage.getItem('si_theme');
+    if(!th) th=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+    document.documentElement.setAttribute('data-theme',th);
+  }catch(e){}
+})();
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+ {"@type":"WebApplication","name":"Stream Inspector","url":"https://tliens.github.io/stream-inspector/",
+  "applicationCategory":"DeveloperApplication","operatingSystem":"Any",
+  "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},
+  "inLanguage":["en","zh-CN"],
+  "description":"Online live stream pull debugger for developers: play and diagnose HLS (m3u8), LL-HLS, HTTP-FLV, MPEG-TS, DASH and WebRTC WHEP streams. Includes playlist/MPD parser, real-time metrics, event logs, CORS and mixed-content checks, and RTMP/RTSP command-line assistance. Runs 100% in the browser."},
+ {"@type":"FAQPage","mainEntity":[
+  {"@type":"Question","name":"Which pull-stream formats can I debug with Stream Inspector?",
+   "acceptedAnswer":{"@type":"Answer","text":"HLS (.m3u8, including low-latency HLS and native Safari playback), HTTP-FLV and MPEG-TS over HTTP, MPEG-DASH (.mpd), WebRTC via the WHEP standard, and native progressive media (MP4/WebM). RTMP and RTSP cannot be played by browsers directly, so the tool instead validates the URL and generates ready-to-run ffplay / ffmpeg / VLC commands plus gateway conversion tips."}},
+  {"@type":"Question","name":"Why does my stream fail in the browser but play fine in VLC or ffplay?",
+   "acceptedAnswer":{"@type":"Answer","text":"The most common cause is CORS. Browsers enforce CORS on the fetches made by MSE-based players (hls.js, mpegts.js, dash.js), while VLC and ffplay ignore CORS entirely. Your server or CDN must return Access-Control-Allow-Origin for the playlist, segments and any encryption keys. The Pre-flight panel in Stream Inspector tells you exactly which request failed and why."}},
+  {"@type":"Question","name":"Why can't browsers play RTMP or RTSP streams directly?",
+   "acceptedAnswer":{"@type":"Answer","text":"Modern browsers only decode media delivered through HTML5 media elements or MSE, which speak HTTP-based formats; the RTMP and RTSP protocols were never implemented in browsers (Flash is dead). To view an RTMP/RTSP source in a browser, convert it with a streaming gateway such as SRS, nginx-http-flv-module, MediaMTX or go2rtc into HTTP-FLV, HLS or WebRTC/WHEP."}},
+  {"@type":"Question","name":"Is my stream URL or data uploaded anywhere?",
+   "acceptedAnswer":{"@type":"Answer","text":"No. All parsing, probing and playback run locally in your browser. Stream URLs are only fetched directly from your own streaming server by your browser; nothing is proxied or stored server-side. Your input history lives in localStorage only, and you can clear it anytime."}},
+  {"@type":"Question","name":"What latency can I expect from each protocol?",
+   "acceptedAnswer":{"@type":"Answer","text":"Typical glass-to-glass latency: WebRTC (WHEP) under 1 second; HTTP-FLV and MPEG-TS around 1–3 seconds; LL-HLS 2–5 seconds; standard HLS and DASH 6–30 seconds depending on segment length and buffer settings. RTSP achieves 0.5–2 seconds but requires a native player such as ffplay or VLC."}}
+ ]}
+]}
+</script>
+<style>
+:root{
+  --r:14px; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+}
+html[data-theme="dark"]{
+  --bg:#0a0e16; --bg2:#0d1320; --panel:#101827; --panel2:#0b1220; --border:#1f2a3d; --border2:#2a3a55;
+  --text:#e6ebf4; --muted:#93a0b5; --faint:#5c6a82;
+  --accent:#22d3ee; --accent-dim:#164e63; --accent2:#a78bfa;
+  --good:#34d399; --warn:#fbbf24; --err:#f87171; --pink:#f472b6; --amber:#fbbf24;
+  --shadow:0 10px 30px rgba(0,0,0,.35);
+  --chip:#182338; --hover:#16213a;
+}
+html[data-theme="light"]{
+  --bg:#f3f6fb; --bg2:#eef2f8; --panel:#ffffff; --panel2:#f8fafc; --border:#e2e8f0; --border2:#cbd5e1;
+  --text:#0f172a; --muted:#5b6b83; --faint:#94a3b8;
+  --accent:#0e7490; --accent-dim:#cffafe; --accent2:#7c3aed;
+  --good:#059669; --warn:#b45309; --err:#dc2626; --pink:#db2777; --amber:#b45309;
+  --shadow:0 8px 24px rgba(15,23,42,.08);
+  --chip:#eef2f7; --hover:#eef4fb;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+.hidden{display:none!important}
+/* header */
+header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.header-inner{display:flex;align-items:center;gap:14px;height:58px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:17px;color:var(--text)}
+.brand:hover{text-decoration:none}
+.brand svg{flex:none}
+.brand .beta{font-size:10px;font-weight:600;color:var(--accent);border:1px solid var(--accent);border-radius:99px;padding:0 7px;letter-spacing:.5px}
+.header-spacer{flex:1}
+.header-link{color:var(--muted);font-size:13.5px;display:flex;align-items:center;gap:5px}
+.icon-btn{background:var(--chip);border:1px solid var(--border);color:var(--text);border-radius:9px;height:34px;min-width:34px;padding:0 10px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;justify-content:center}
+.icon-btn:hover{background:var(--hover);border-color:var(--border2)}
+/* hero */
+.hero{padding:34px 0 6px}
+h1{font-size:clamp(22px,3.4vw,32px);line-height:1.25;margin:0 0 8px;letter-spacing:-.3px}
+h1 .grad{background:linear-gradient(92deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--muted);margin:0 0 18px;max-width:860px;font-size:15px}
+.sub b{color:var(--text);font-weight:600}
+/* cards */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;box-shadow:var(--shadow)}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+h2{font-size:15.5px;margin:0;font-weight:700}
+h3{font-size:13.5px;margin:16px 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+/* input card */
+.input-card{margin-top:6px}
+.url-row{display:flex;align-items:center;gap:10px}
+.fmt-badge{flex:none;min-width:64px;text-align:center;font-family:var(--mono);font-size:12px;font-weight:700;padding:9px 10px;border-radius:10px;background:var(--chip);border:1px solid var(--border);color:var(--muted);white-space:nowrap}
+.fmt-badge.on{border-color:currentColor}
+#urlInput{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:14px;padding:11px 13px;outline:none;transition:border-color .15s}
+#urlInput:focus{border-color:var(--accent)}
+#clearBtn{flex:none;background:none;border:none;color:var(--faint);font-size:18px;cursor:pointer;padding:6px}
+.controls-row{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+.btn{background:var(--chip);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;font-family:var(--sans)}
+.btn:hover{background:var(--hover);border-color:var(--border2)}
+.btn.primary{background:linear-gradient(92deg,#0891b2,#7c3aed);border:none;color:#fff}
+.btn.primary:hover{filter:brightness(1.12)}
+.btn.small{padding:5px 11px;font-size:12.5px;border-radius:8px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+select.sel,input.txt{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:8px 10px;font-size:13.5px;font-family:var(--sans);outline:none}
+select.sel:focus{border-color:var(--accent)}
+.kbd-hint{color:var(--faint);font-size:12px;margin-left:auto}
+.kbd-hint kbd{background:var(--chip);border:1px solid var(--border);border-radius:5px;padding:0 5px;font-family:var(--mono);font-size:11px}
+.opts{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);align-items:center}
+.opts label{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer}
+.opts input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px}
+.opts input.txt{width:250px;font-family:var(--mono);font-size:12.5px}
+.row-label{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+.row-label .lbl{font-size:12.5px;color:var(--faint);flex:none;text-transform:uppercase;letter-spacing:.5px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--chip);border:1px solid var(--border);color:var(--muted);border-radius:99px;padding:4px 12px;font-size:12.5px;cursor:pointer;transition:.15s;max-width:280px}
+.chip:hover{border-color:var(--accent);color:var(--text)}
+.chip .dot{width:7px;height:7px;border-radius:99px;flex:none}
+.chip .x{color:var(--faint);margin-left:2px}
+.chip .u{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;font-family:var(--mono);font-size:11.5px}
+/* banners */
+.banner{border-radius:12px;padding:12px 15px;margin-top:14px;font-size:13.5px;border:1px solid;display:flex;gap:10px;align-items:flex-start}
+.banner.err{background:color-mix(in srgb,var(--err) 9%,var(--panel));border-color:color-mix(in srgb,var(--err) 40%,transparent)}
+.banner.warn{background:color-mix(in srgb,var(--warn) 9%,var(--panel));border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.banner .ico{flex:none;font-size:16px;line-height:1.3}
+.banner b{font-weight:700}
+.banner .fix{color:var(--muted);margin-top:3px}
+.banner a{font-weight:600}
+/* main grid */
+.grid-main{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,1fr);gap:16px;margin-top:16px}
+.side-col{display:flex;flex-direction:column;gap:16px}
+.player-card{padding:12px}
+.player-frame{position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:16/9}
+.player-frame video{width:100%;height:100%;display:block;background:#000}
+#video:fullscreen{object-fit:contain}
+.player-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#5d6b82;font-size:13.5px;text-align:center;padding:20px;pointer-events:none}
+.player-placeholder svg{opacity:.55}
+.live-badge{position:absolute;top:10px;right:10px;background:#dc2626;color:#fff;font-size:11px;font-weight:800;letter-spacing:1px;padding:3px 9px;border-radius:6px;display:flex;align-items:center;gap:5px}
+.live-badge .blink{width:7px;height:7px;background:#fff;border-radius:99px;animation:bl 1.4s infinite}
+@keyframes bl{50%{opacity:.25}}
+.chipstats{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}
+.cstat{background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:5px 11px;font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:baseline}
+.cstat b{color:var(--text);font-family:var(--mono);font-size:12.5px;font-weight:600}
+/* preflight */
+#preflightList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+#preflightList li{display:flex;gap:9px;align-items:flex-start;padding:6px 4px;font-size:13px;border-radius:8px}
+#preflightList li .ic{flex:none;width:17px;text-align:center}
+#preflightList li.ok .ic{color:var(--good)}
+#preflightList li.bad .ic{color:var(--err)}
+#preflightList li.warn{color:var(--text)} #preflightList li.warn .ic{color:var(--warn)}
+#preflightList li .t{color:var(--muted)} #preflightList li.ok .t,#preflightList li.bad .t{color:var(--text)}
+#preflightList li .t code{font-family:var(--mono);font-size:11.5px;background:var(--chip);padding:1px 5px;border-radius:5px}
+#preflightList li.pending{color:var(--faint)}
+/* summary */
+.kv{display:flex;justify-content:space-between;gap:12px;padding:5.5px 0;border-bottom:1px dashed var(--border);font-size:13px}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--muted);flex:none}
+.kv .v{text-align:right;font-family:var(--mono);font-size:12.5px;word-break:break-all}
+.tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:6px;letter-spacing:.4px}
+/* rtmp card */
+.cmd-block{position:relative;background:var(--panel2);border:1px solid var(--border);border-radius:9px;margin:8px 0}
+.cmd-block pre{margin:0;padding:10px 12px;font-family:var(--mono);font-size:12px;color:var(--text);overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.cmd-block .copy-cmd{position:absolute;top:6px;right:6px}
+.cmd-block .cmd-lbl{position:absolute;top:-9px;left:10px;background:var(--panel);border:1px solid var(--border);border-radius:6px;font-size:10px;font-weight:700;padding:0 7px;color:var(--muted);letter-spacing:.5px}
+/* tabs */
+.tabs-section{margin-top:16px}
+.tabbar{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--border);scrollbar-width:none}
+.tabbar::-webkit-scrollbar{display:none}
+.tab-btn{background:none;border:none;color:var(--muted);font-size:13.5px;font-weight:600;padding:10px 14px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:7px;font-family:var(--sans)}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-btn .cnt{background:var(--chip);border-radius:99px;font-size:10.5px;padding:0 7px;color:var(--muted)}
+.tab-btn .cnt.bad{background:color-mix(in srgb,var(--err) 25%,transparent);color:var(--err)}
+.pane{display:none;padding:18px 4px 8px;animation:fadein .18s}
+.pane.active{display:block}
+@keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1}}
+.pane-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.pane-head .grow{flex:1}
+/* tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:11px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{background:var(--panel2);text-align:left;padding:8px 12px;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-bottom:1px solid var(--border)}
+td{padding:7px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td code, .mono{font-family:var(--mono);font-size:12px}
+tbody tr:hover{background:var(--hover)}
+.num{text-align:right;font-family:var(--mono);font-size:12px}
+/* metrics */
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:10px}
+.mcell{background:var(--panel2);border:1px solid var(--border);border-radius:11px;padding:10px 13px}
+.mcell .ml{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.mcell .mv{font-family:var(--mono);font-size:16.5px;font-weight:700;color:var(--text);word-break:break-all}
+.mcell .mv .u{font-size:11px;color:var(--muted);font-weight:400;margin-left:2px}
+.spark-wrap{margin-top:14px}
+.spark-head{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px}
+.spark-head b{color:var(--text);font-family:var(--mono)}
+canvas.spark{width:100%;height:52px;display:block;background:var(--panel2);border:1px solid var(--border);border-radius:9px}
+.bufbar-wrap{margin-top:14px}
+.bufbar{position:relative;height:22px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.bufbar .seg{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--accent) 30%,transparent);border-left:1px solid var(--accent)}
+.bufbar .ph{position:absolute;top:0;bottom:0;width:2px;background:var(--err)}
+.bufbar .scale{position:absolute;inset:0;display:flex;justify-content:space-between;font-size:10px;color:var(--faint);padding:2px 5px;font-family:var(--mono);pointer-events:none}
+/* logs */
+.log-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.log-toolbar label{display:inline-flex;gap:5px;align-items:center;font-size:12.5px;color:var(--muted);cursor:pointer}
+.log-toolbar input[type=checkbox]{accent-color:var(--accent)}
+#logFilter{width:190px;font-family:var(--mono);font-size:12px}
+.log-list{background:var(--panel2);border:1px solid var(--border);border-radius:11px;max-height:430px;overflow-y:auto;font-family:var(--mono);font-size:12px;padding:6px 0}
+.log-row{display:flex;gap:9px;padding:3.5px 12px;border-bottom:1px solid color-mix(in srgb,var(--border) 45%,transparent)}
+.log-row:hover{background:var(--hover)}
+.log-row .lt{color:var(--faint);flex:none}
+.log-row .ltag{flex:none;font-weight:700;min-width:44px}
+.log-row .lmsg{word-break:break-all;color:var(--text)}
+.log-row.info .ltag{color:var(--accent)} .log-row.ok .ltag{color:var(--good)}
+.log-row.warn .ltag{color:var(--warn)} .log-row.err .ltag{color:var(--err)}
+.log-row.warn .lmsg{color:var(--warn)} .log-row.err .lmsg{color:var(--err)}
+.log-empty{padding:26px;text-align:center;color:var(--faint)}
+/* manifest */
+pre.raw{background:var(--panel2);border:1px solid var(--border);border-radius:11px;padding:13px 15px;font-family:var(--mono);font-size:12px;line-height:1.6;overflow:auto;max-height:420px;margin:0;white-space:pre-wrap;word-break:break-all}
+pre.raw .hl{background:color-mix(in srgb,var(--accent) 28%,transparent);border-radius:3px}
+.seg-limit{font-size:12px;color:var(--faint);margin-top:8px}
+/* errors table */
+.err-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.ef-chip{background:var(--chip);border:1px solid var(--border);color:var(--muted);border-radius:99px;padding:4px 13px;font-size:12.5px;cursor:pointer}
+.ef-chip.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);font-weight:600}
+html[data-theme="dark"] .ef-chip.active{background:color-mix(in srgb,var(--accent) 16%,var(--panel));color:var(--accent)}
+td .cause{color:var(--muted);font-size:12.5px}
+td .sev{font-size:10px;font-weight:800;padding:1px 7px;border-radius:6px;letter-spacing:.4px;white-space:nowrap}
+.sev.high{background:color-mix(in srgb,var(--err) 18%,transparent);color:var(--err)}
+.sev.med{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.sev.low{background:color-mix(in srgb,var(--good) 16%,transparent);color:var(--good)}
+/* guide */
+.guide-block{max-width:900px}
+.gtable td:first-child{font-weight:600;white-space:nowrap}
+.gtable td code{background:var(--chip);padding:1px 6px;border-radius:5px}
+ol.steps{padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:var(--muted)}
+ol.steps b{color:var(--text)}
+.faq-item{border-bottom:1px dashed var(--border);padding:12px 0}
+.faq-item .q{font-weight:700;font-size:14px;margin-bottom:5px}
+.faq-item .a{color:var(--muted);font-size:13.5px}
+/* footer */
+footer{border-top:1px solid var(--border);margin-top:36px;padding:22px 0 34px;color:var(--faint);font-size:12.5px}
+.foot-inner{display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+/* toast */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--panel);border:1px solid var(--border2);color:var(--text);padding:10px 18px;border-radius:11px;font-size:13.5px;box-shadow:var(--shadow);transition:.25s;z-index:99;max-width:88vw}
+#toast.show{transform:translateX(-50%) translateY(0)}
+@media (max-width:960px){
+  .grid-main{grid-template-columns:1fr}
+  .kbd-hint{display:none}
+  .url-row{flex-wrap:wrap}
+  #urlInput{width:100%;flex:none;order:3}
+  .fmt-badge{order:1} #clearBtn{order:2;margin-left:auto}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap header-inner">
+    <a class="brand" href="./" aria-label="Stream Inspector home">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="1.5" y="4" width="21" height="16" rx="4" stroke="url(#g1)" stroke-width="2"/><circle cx="12" cy="12" r="3.4" fill="url(#g1)"/><path d="M12 8.6V12l2.4 1.4" stroke="#0a0e16" stroke-width="1.3" stroke-linecap="round"/><defs><linearGradient id="g1" x1="1.5" y1="4" x2="22.5" y2="20"><stop stop-color="#22d3ee"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs></svg>
+      Stream Inspector <span class="beta">BETA</span>
+    </a>
+    <div class="header-spacer"></div>
+    <a class="header-link" href="#guide" data-i18n="navGuide">Guide</a>
+    <a class="header-link" href="https://github.com/Tliens/stream-inspector" target="_blank" rel="noopener">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      GitHub
+    </a>
+    <button class="icon-btn" id="langBtn" title="切换语言 / Switch language">中文</button>
+    <button class="icon-btn" id="themeBtn" title="Toggle theme">◐</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1><span data-i18n="h1a">Live Stream Pull Debugger</span> — <span class="grad">HLS · HTTP-FLV · DASH · WebRTC</span></h1>
+    <p class="sub" data-i18n="sub">Paste a pull-stream URL to play it and debug it like a pro: pre-flight connectivity &amp; CORS checks, playlist/MPD parsing, real-time bitrate / buffer / dropped-frame metrics, full engine event logs and an error-code reference. <b>Everything runs locally in your browser.</b></p>
+  </section>
+
+  <section class="card input-card">
+    <div class="url-row">
+      <div class="fmt-badge" id="fmtBadge">URL</div>
+      <input id="urlInput" type="text" spellcheck="false" autocomplete="off" placeholder="https://example.com/live/stream.m3u8   ·   http://host/app/stream.flv   ·   https://host/manifest.mpd   ·   https://host/whep   ·   rtmp:// rtsp://">
+      <button id="clearBtn" title="Clear">✕</button>
+    </div>
+    <div class="controls-row">
+      <button class="btn primary" id="playBtn">▶ <span data-i18n="btnPull">Pull &amp; Play</span></button>
+      <button class="btn" id="stopBtn">■ <span data-i18n="btnStop">Stop</span></button>
+      <button class="btn" id="reloadBtn" disabled>⟳ <span data-i18n="btnReload">Reload</span></button>
+      <button class="btn" id="shareBtn" data-i18n="btnShare">Share link</button>
+      <select class="sel" id="formatSel" title="Format">
+        <option value="auto" data-i18n="fmtAuto">Auto detect</option>
+        <option value="hls">HLS / m3u8</option>
+        <option value="llhls">LL-HLS</option>
+        <option value="flv">HTTP-FLV</option>
+        <option value="ts">MPEG-TS</option>
+        <option value="dash">DASH / mpd</option>
+        <option value="whep">WebRTC / WHEP</option>
+        <option value="mp4">MP4 / WebM (native)</option>
+        <option value="rtmp">RTMP (assist)</option>
+        <option value="rtsp">RTSP (assist)</option>
+      </select>
+      <span class="kbd-hint"><kbd>/</kbd> <span data-i18n="kbdFocus">focus</span> · <kbd>Enter</kbd> <span data-i18n="kbdPlay">play</span></span>
+    </div>
+
+    <div class="opts hidden" id="opts-hls">
+      <label><input type="checkbox" id="optHlsWorker" checked> <span data-i18n="optWorker">Worker demux</span></label>
+      <label><input type="checkbox" id="optHlsLL" checked> <span data-i18n="optLL">Low-latency mode</span></label>
+      <label><span data-i18n="optStart">Start quality</span>&nbsp;
+        <select class="sel" id="optHlsStart"><option value="-1" data-i18n="optAuto">Auto (ABR)</option><option value="0" data-i18n="optLowest">Lowest</option><option value="999" data-i18n="optHighest">Highest</option></select></label>
+      <label><span data-i18n="optMaxBuf">Max buffer</span>&nbsp;
+        <select class="sel" id="optHlsBuf"><option value="30">30 s</option><option value="60" selected>60 s</option><option value="120">120 s</option></select></label>
+    </div>
+    <div class="opts hidden" id="opts-flv">
+      <label><input type="checkbox" id="optFlvLive" checked> <span data-i18n="optLive">Live stream</span></label>
+      <label><input type="checkbox" id="optFlvStash"> <span data-i18n="optStash">Enable stash buffer (smoother, +latency)</span></label>
+      <span class="kbd-hint" data-i18n="flvHint">Engine: mpegts.js — also supports .ts over HTTP / WebSocket</span>
+    </div>
+    <div class="opts hidden" id="opts-dash">
+      <label><input type="checkbox" id="optDashAbr" checked> <span data-i18n="optAbr">Auto bitrate (ABR)</span></label>
+      <span class="kbd-hint" data-i18n="dashHint">Engine: dash.js 4</span>
+    </div>
+    <div class="opts hidden" id="opts-whep">
+      <label><span data-i18n="optIce">ICE servers</span>&nbsp;
+        <input class="txt" id="optIce" value="stun:stun.l.google.com:19302" spellcheck="false"></label>
+      <span class="kbd-hint" data-i18n="whepHint">Standard WHEP: POST SDP offer → 201 SDP answer · supports webrtc:// (SRS) auto-conversion</span>
+    </div>
+    <div class="opts hidden" id="opts-native"></div>
+
+    <div class="row-label"><span class="lbl" data-i18n="lblDemo">Demo streams</span>
+      <span class="chip" data-demo="1" data-fmt="hls"><span class="dot" style="background:#22d3ee"></span>HLS fMP4+AES · Apple</span>
+      <span class="chip" data-demo="1" data-fmt="hls"><span class="dot" style="background:#22d3ee"></span>HLS VOD · Big Buck Bunny</span>
+      <span class="chip" data-demo="1" data-fmt="hls"><span class="dot" style="background:#22d3ee"></span>HLS multi-subs · BipBop</span>
+      <span class="chip" data-demo="1" data-fmt="hls"><span class="dot" style="background:#22d3ee"></span>HLS multi-audio/subs · ToS</span>
+      <span class="chip" data-demo="1" data-fmt="dash"><span class="dot" style="background:#a78bfa"></span>DASH · BBB 30fps</span>
+      <span class="chip" data-demo="1" data-fmt="mp4"><span class="dot" style="background:#fbbf24"></span>MP4 · Flower (MDN)</span>
+    </div>
+    <div class="row-label hidden" id="historyRow"><span class="lbl" data-i18n="lblHistory">Recent</span><span id="historyChips" style="display:contents"></span>
+      <button class="btn small" id="histClear" data-i18n="btnClearHist">Clear</button>
+    </div>
+  </section>
+
+  <div id="errBanner" class="banner err hidden"><span class="ico">⛔</span><div><b id="errTitle"></b><div class="fix" id="errFix"></div></div></div>
+  <div id="warnBanner" class="banner warn hidden"><span class="ico">⚠️</span><div><b id="warnTitle"></b><div class="fix" id="warnFix"></div></div></div>
+
+  <section class="grid-main">
+    <div class="player-col">
+      <div class="card player-card">
+        <div class="player-frame">
+          <video id="video" playsinline controls></video>
+          <div class="player-placeholder" id="playerPh">
+            <svg width="46" height="46" viewBox="0 0 24 24" fill="none"><rect x="1.5" y="4" width="21" height="16" rx="4" stroke="currentColor" stroke-width="1.6"/><path d="M10 9.2v5.6l4.8-2.8L10 9.2Z" fill="currentColor"/></svg>
+            <span data-i18n="phPlayer">Player idle — paste a pull URL above and hit “Pull &amp; Play”</span>
+          </div>
+          <span class="live-badge hidden" id="liveBadge"><span class="blink"></span>LIVE</span>
+        </div>
+        <div class="chipstats" id="chipStats"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 data-i18n="hPreflight">Pre-flight checks</h2><button class="btn small" id="recheckBtn" data-i18n="btnRecheck">Re-run</button></div>
+        <ul id="preflightList"><li class="pending"><span class="ic">·</span><span class="t" data-i18n="pfIdle">Checks run automatically when you press “Pull &amp; Play”.</span></li></ul>
+      </div>
+    </div>
+
+    <aside class="side-col">
+      <div class="card">
+        <div class="card-head"><h2 data-i18n="hSummary">Stream summary</h2><button class="btn small" id="copyReportBtn" data-i18n="btnCopyReport">Copy report</button></div>
+        <div id="summaryBody">
+          <div class="kv"><span class="k" data-i18n="kStatus">Status</span><span class="v" id="sumStatus">idle</span></div>
+          <div class="kv"><span class="k" data-i18n="kFormat">Format</span><span class="v" id="sumFormat">—</span></div>
+          <div class="kv"><span class="k" data-i18n="kEngine">Engine</span><span class="v" id="sumEngine">—</span></div>
+          <div class="kv"><span class="k" data-i18n="kType">Stream type</span><span class="v" id="sumType">—</span></div>
+          <div class="kv"><span class="k" data-i18n="kDuration">Duration / window</span><span class="v" id="sumDuration">—</span></div>
+        </div>
+      </div>
+      <div class="card hidden" id="nonPlayableCard">
+        <div class="card-head"><h2 id="npTitle">RTMP assist</h2></div>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 6px" data-i18n="npWhy">Browsers can't pull RTMP/RTSP directly (no protocol support since Flash died). Fastest ways forward:</p>
+        <div id="npBody"></div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="tabs-section" id="tabs">
+    <div class="tabbar" role="tablist">
+      <button class="tab-btn active" id="tab-overview" data-pane="overview">📋 <span data-i18n="tabOverview">Overview</span></button>
+      <button class="tab-btn" id="tab-manifest" data-pane="manifest">📄 <span data-i18n="tabManifest">Manifest</span></button>
+      <button class="tab-btn" id="tab-metrics" data-pane="metrics">📈 <span data-i18n="tabMetrics">Metrics</span></button>
+      <button class="tab-btn" id="tab-logs" data-pane="logs">🧾 <span data-i18n="tabLogs">Logs</span> <span class="cnt" id="logCount">0</span></button>
+      <button class="tab-btn" id="tab-errors" data-pane="errors">🧯 <span data-i18n="tabErrors">Error reference</span></button>
+      <button class="tab-btn" id="tab-guide" data-pane="guide">📚 <span data-i18n="tabGuide">Guide</span></button>
+    </div>
+
+    <div class="pane active" id="pane-overview"><div id="overviewBody"><p style="color:var(--faint)" data-i18n="ovEmpty">Load a stream to see its parsed structure: variants / renditions, codecs, encryption, segment stats and engine details.</p></div></div>
+
+    <div class="pane" id="pane-manifest">
+      <div class="pane-head">
+        <h2 data-i18n="hManifest">Manifest</h2><span class="mono" style="color:var(--muted);font-size:12px" id="manifestMeta"></span><span class="grow"></span>
+        <button class="btn small" id="mfCopy" data-i18n="btnCopy">Copy</button>
+      </div>
+      <div class="row-label hidden" id="variantNav" style="margin:0 0 12px"><span class="lbl" data-i18n="lblVariants">Variants (click to load)</span><span id="variantChips" style="display:contents"></span></div>
+      <pre class="raw" id="manifestRaw" data-i18n="mfEmpty">Manifest will appear here after a stream is loaded.</pre>
+      <div id="segWrap" class="hidden">
+        <h3 data-i18n="hSegments">Segments (from playlist)</h3>
+        <div class="tbl-wrap"><table id="segTable"></table></div>
+        <div class="seg-limit" id="segNote"></div>
+      </div>
+      <div id="mpdWrap" class="hidden">
+        <h3 data-i18n="hRepresentations">Representations</h3>
+        <div class="tbl-wrap"><table id="mpdTable"></table></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-metrics">
+      <div class="pane-head"><h2 data-i18n="hMetrics">Real-time metrics</h2><span class="grow"></span><span class="mono" style="font-size:12px;color:var(--muted)" data-i18n="metricsHint">sampled every 1 s while playing</span></div>
+      <div class="metrics-grid" id="metricsGrid"></div>
+      <div class="spark-wrap">
+        <div class="spark-head"><span data-i18n="spBitrate">Measured video bitrate</span><b id="spBrNow">—</b></div>
+        <canvas class="spark" id="sparkBitrate"></canvas>
+      </div>
+      <div class="spark-wrap">
+        <div class="spark-head"><span data-i18n="spBuffer">Buffer ahead</span><b id="spBufNow">—</b></div>
+        <canvas class="spark" id="sparkBuffer"></canvas>
+      </div>
+      <div class="bufbar-wrap">
+        <div class="spark-head"><span data-i18n="spRanges">Buffered ranges</span><b id="spRgNow">—</b></div>
+        <div class="bufbar" id="bufferBar"><div class="scale"><span>-10s</span><span>now</span><span>+50s</span></div></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-logs">
+      <div class="log-toolbar">
+        <label><input type="checkbox" id="lgInfo" checked> <span data-i18n="lgInfo">Info</span></label>
+        <label><input type="checkbox" id="lgOk" checked> <span data-i18n="lgOk">OK</span></label>
+        <label><input type="checkbox" id="lgWarn" checked> <span data-i18n="lgWarn">Warn</span></label>
+        <label><input type="checkbox" id="lgErr" checked> <span data-i18n="lgErr">Error</span></label>
+        <input class="txt" id="logFilter" placeholder="filter text…" spellcheck="false">
+        <span class="grow"></span>
+        <button class="btn small" id="logCopy" data-i18n="btnCopyLogs">Copy</button>
+        <button class="btn small" id="logDl" data-i18n="btnDlLogs">Download</button>
+        <button class="btn small" id="logClear" data-i18n="btnClearLogs">Clear</button>
+      </div>
+      <div class="log-list" id="logList"><div class="log-empty" data-i18n="logEmpty">No events yet — engine, network and parser messages will land here.</div></div>
+    </div>
+
+    <div class="pane" id="pane-errors">
+      <p style="color:var(--muted);font-size:13px;margin:0 0 12px" data-i18n="errIntro">Offline reference of the error codes reported by each engine, with typical causes and fixes. When a live error occurs, the Overview tab links straight to the matching row.</p>
+      <div class="err-filters" id="errFilters"></div>
+      <div class="tbl-wrap"><table id="errTable"></table></div>
+    </div>
+
+    <div class="pane" id="pane-guide">
+      <div class="guide-block">
+        <h3 data-i18n="hCompare">Protocol comparison</h3>
+        <div class="tbl-wrap"><table class="gtable" id="cmpTable"></table></div>
+        <h3 data-i18n="hWorkflow">Debugging workflow</h3>
+        <ol class="steps">
+          <li><b data-i18n="wf1b">Paste the URL.</b> <span data-i18n="wf1">Stream Inspector auto-detects the format from the extension and scheme; override it with the selector if needed.</span></li>
+          <li><b data-i18n="wf2b">Read the pre-flight checks.</b> <span data-i18n="wf2">Connectivity, CORS, mixed-content and manifest validity are verified before the player even starts — most “works in VLC, fails in browser” cases are CORS.</span></li>
+          <li><b data-i18n="wf3b">Inspect the Manifest tab.</b> <span data-i18n="wf3">Check variants &amp; codecs, encryption (EXT-X-KEY / ContentProtection), LL-HLS parts, live/VOD type, and jump straight into any variant playlist.</span></li>
+          <li><b data-i18n="wf4b">Watch Metrics while playing.</b> <span data-i18n="wf4">Measured bitrate, buffer ahead, dropped frames and (for WHEP) RTT / packet loss reveal bandwidth and encoder-side problems.</span></li>
+          <li><b data-i18n="wf5b">Trace the first error in Logs.</b> <span data-i18n="wf5">Filter by severity, then look the code up in the Error reference tab for cause &amp; fix.</span></li>
+        </ol>
+        <h3 data-i18n="hRtmpAssist">RTMP / RTSP in a browser</h3>
+        <p style="color:var(--muted);font-size:13.5px" data-i18n="rtmpAssist">Since browsers dropped Flash there is no native RTMP/RTSP pull. Either play locally with ffplay/VLC, or convert at the edge with a gateway. Pick an RTMP/RTSP URL in the format selector to get ready-to-run commands generated from your URL.</p>
+        <h3 data-i18n="hFaq">FAQ</h3>
+        <div class="faq-item"><div class="q" data-i18n="fq1">Which pull-stream formats can I debug?</div><div class="a" data-i18n="fa1">HLS (.m3u8, incl. LL-HLS and native Safari playback), HTTP-FLV and MPEG-TS over HTTP, MPEG-DASH (.mpd), WebRTC via WHEP, plus native MP4/WebM. RTMP &amp; RTSP get URL validation and ready-to-run command-line assist instead.</div></div>
+        <div class="faq-item"><div class="q" data-i18n="fq2">Why does my stream fail here but play in VLC / ffplay?</div><div class="a" data-i18n="fa2">Almost always CORS. Browser-based players (hls.js, mpegts.js, dash.js) fetch media with JavaScript, so the server must send <code>Access-Control-Allow-Origin</code>; VLC ignores CORS entirely. The Pre-flight panel shows exactly which request is blocked.</div></div>
+        <div class="faq-item"><div class="q" data-i18n="fq3">Why can't browsers play RTMP / RTSP directly?</div><div class="a" data-i18n="fa3">Browsers only decode HTML5 media elements / MSE formats — the RTMP &amp; RTSP protocols were never implemented. Convert at the edge with SRS, nginx-http-flv-module, MediaMTX or go2rtc into HTTP-FLV, HLS or WebRTC/WHEP.</div></div>
+        <div class="faq-item"><div class="q" data-i18n="fq4">Is my stream URL uploaded anywhere?</div><div class="a" data-i18n="fa4">No. Parsing, probing and playback run 100% locally — your browser talks to your streaming server directly. History lives only in localStorage and can be cleared with one click.</div></div>
+        <div class="faq-item"><div class="q" data-i18n="fq5">What latency can I expect from each protocol?</div><div class="a" data-i18n="fa5">WebRTC (WHEP) &lt;1 s · HTTP-FLV / MPEG-TS 1–3 s · LL-HLS 2–5 s · HLS / DASH 6–30 s · RTSP 0.5–2 s (native players only). See the comparison table above.</div></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot-inner">
+    <span data-i18n="footPrivacy">🔒 100% client-side: URLs are fetched directly by your browser, nothing is proxied or stored server-side. History stays in localStorage.</span>
+    <span>
+      <a href="https://github.com/Tliens/stream-inspector" target="_blank" rel="noopener" data-i18n="footOss">Open source</a> ·
+      <a href="https://tliens.github.io/sse-inspector/" target="_blank" rel="noopener">SSE Inspector</a> ·
+      © 2026 Tliens
+    </span>
+  </div>
+</footer>
+
+<div id="toast"></div>
+<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "6a164def7d63477cba60148b8417ca95"}'></script>
+<script type="module">
+/* ============ i18n ============ */
+const I18N = {
+en:{
+  navGuide:'Guide', h1a:'Live Stream Pull Debugger',
+  sub:'Paste a pull-stream URL to play it and debug it like a pro: pre-flight connectivity & CORS checks, playlist/MPD parsing, real-time bitrate / buffer / dropped-frame metrics, full engine event logs and an error-code reference. Everything runs locally in your browser.',
+  btnPull:'Pull & Play', btnStop:'Stop', btnReload:'Reload', btnShare:'Share link',
+  fmtAuto:'Auto detect', kbdFocus:'focus', kbdPlay:'play',
+  optWorker:'Worker demux', optLL:'Low-latency mode', optStart:'Start quality', optAuto:'Auto (ABR)', optLowest:'Lowest', optHighest:'Highest', optMaxBuf:'Max buffer',
+  optLive:'Live stream', optStash:'Enable stash buffer (smoother, +latency)', flvHint:'Engine: mpegts.js — also supports .ts over HTTP / WebSocket',
+  optAbr:'Auto bitrate (ABR)', dashHint:'Engine: dash.js 4',
+  optIce:'ICE servers', whepHint:'Standard WHEP: POST SDP offer → 201 SDP answer · supports webrtc:// (SRS) auto-conversion',
+  lblDemo:'Demo streams', lblHistory:'Recent', btnClearHist:'Clear',
+  phPlayer:'Player idle — paste a pull URL above and hit “Pull & Play”',
+  hPreflight:'Pre-flight checks', btnRecheck:'Re-run', pfIdle:'Checks run automatically when you press “Pull & Play”.',
+  hSummary:'Stream summary', btnCopyReport:'Copy report',
+  kStatus:'Status', kFormat:'Format', kEngine:'Engine', kType:'Stream type', kDuration:'Duration / window',
+  npWhy:"Browsers can't pull RTMP/RTSP directly (no protocol support since Flash died). Fastest ways forward:",
+  tabOverview:'Overview', tabManifest:'Manifest', tabMetrics:'Metrics', tabLogs:'Logs', tabErrors:'Error reference', tabGuide:'Guide',
+  ovEmpty:'Load a stream to see its parsed structure: variants / renditions, codecs, encryption, segment stats and engine details.',
+  hManifest:'Manifest', btnCopy:'Copy', lblVariants:'Variants (click to load)', mfEmpty:'Manifest will appear here after a stream is loaded.',
+  hSegments:'Segments (from playlist)', hRepresentations:'Representations',
+  hMetrics:'Real-time metrics', metricsHint:'sampled every 1 s while playing',
+  spBitrate:'Measured video bitrate', spBuffer:'Buffer ahead', spRanges:'Buffered ranges',
+  lgInfo:'Info', lgOk:'OK', lgWarn:'Warn', lgErr:'Error', btnCopyLogs:'Copy', btnDlLogs:'Download', btnClearLogs:'Clear',
+  logEmpty:'No events yet — engine, network and parser messages will land here.',
+  errIntro:'Offline reference of the error codes reported by each engine, with typical causes and fixes. When a live error occurs, the Overview tab links straight to the matching row.',
+  hCompare:'Protocol comparison', hWorkflow:'Debugging workflow',
+  wf1b:'Paste the URL.', wf1:'Stream Inspector auto-detects the format from the extension and scheme; override it with the selector if needed.',
+  wf2b:'Read the pre-flight checks.', wf2:'Connectivity, CORS, mixed-content and manifest validity are verified before the player even starts — most “works in VLC, fails in browser” cases are CORS.',
+  wf3b:'Inspect the Manifest tab.', wf3:'Check variants & codecs, encryption (EXT-X-KEY / ContentProtection), LL-HLS parts, live/VOD type, and jump straight into any variant playlist.',
+  wf4b:'Watch Metrics while playing.', wf4:'Measured bitrate, buffer ahead, dropped frames and (for WHEP) RTT / packet loss reveal bandwidth and encoder-side problems.',
+  wf5b:'Trace the first error in Logs.', wf5:'Filter by severity, then look the code up in the Error reference tab for cause & fix.',
+  hRtmpAssist:'RTMP / RTSP in a browser', rtmpAssist:'Since browsers dropped Flash there is no native RTMP/RTSP pull. Either play locally with ffplay/VLC, or convert at the edge with a gateway. Pick an RTMP/RTSP URL in the format selector to get ready-to-run commands generated from your URL.',
+  hFaq:'FAQ',
+  fq1:'Which pull-stream formats can I debug?', fa1:'HLS (.m3u8, incl. LL-HLS and native Safari playback), HTTP-FLV and MPEG-TS over HTTP, MPEG-DASH (.mpd), WebRTC via WHEP, plus native MP4/WebM. RTMP & RTSP get URL validation and ready-to-run command-line assist instead.',
+  fq2:'Why does my stream fail here but play in VLC / ffplay?', fa2:'Almost always CORS. Browser-based players (hls.js, mpegts.js, dash.js) fetch media with JavaScript, so the server must send Access-Control-Allow-Origin; VLC ignores CORS entirely. The Pre-flight panel shows exactly which request is blocked.',
+  fq3:"Why can't browsers play RTMP / RTSP directly?", fa3:'Browsers only decode HTML5 media elements / MSE formats — the RTMP & RTSP protocols were never implemented. Convert at the edge with SRS, nginx-http-flv-module, MediaMTX or go2rtc into HTTP-FLV, HLS or WebRTC/WHEP.',
+  fq4:'Is my stream URL uploaded anywhere?', fa4:'No. Parsing, probing and playback run 100% locally — your browser talks to your streaming server directly. History lives only in localStorage and can be cleared with one click.',
+  fq5:'What latency can I expect from each protocol?', fa5:'WebRTC (WHEP) <1 s · HTTP-FLV / MPEG-TS 1–3 s · LL-HLS 2–5 s · HLS / DASH 6–30 s · RTSP 0.5–2 s (native players only). See the comparison table above.',
+  footPrivacy:'🔒 100% client-side: URLs are fetched directly by your browser, nothing is proxied or stored server-side. History stays in localStorage.', footOss:'Open source',
+  title:'Stream Inspector — Online Live Stream Pull Debugger (HLS · HTTP-FLV · DASH · WebRTC)',
+  desc:'Free online live-stream pull (playback) debugger for developers: play and diagnose HLS/m3u8, LL-HLS, HTTP-FLV, MPEG-TS, DASH and WebRTC WHEP streams. Playlist & MPD parser, real-time metrics, event logs, CORS checks. 100% local.',
+  noUrl:'Enter a stream URL first', copied:'Copied ✓', copiedLink:'Share link copied ✓', errLookup:'look up the fix',
+  pfTimeout:'Request timed out', pfBlocked:'Request blocked — CORS / DNS / mixed content / network unreachable', pfBadUrl:'Invalid URL — include the scheme (https://…)',
+  pfMixed:'Mixed content: this HTTPS page cannot fetch an http:// stream', wfMixedT:'Mixed content blocked', wfMixedF:'Serve the stream over HTTPS, or open this page via http:// / localhost for testing.',
+  pfNoMixed:'no mixed-content issue', pfPageHttp:'this page itself is http:// — fine for testing',
+  pfNativeOnly:'MSE unavailable — native Safari playback only (limited diagnostics)',
+  pfHttp:'HTTP {s} — check the URL, auth and hotlink protection', pfMfOk:'Manifest fetched OK', pfNotM3u8:'Response is not a valid M3U8 playlist (HTML error page?)',
+  pfMaster:'Master playlist with {n} variants:', pfMediaPl:'Media playlist', pfSegs:'segments', pfEnc:'Encrypted stream — KEY method {m}', pfLL:'Low-Latency HLS detected (EXT-X-PART)', pfMap:'fMP4 init segment present (EXT-X-MAP)',
+  pfNotXml:'Response is not valid XML/MPD', pfDur:'duration', pfShift:'timeshift',
+  pfReach:'Endpoint reachable', pfFirstChunk:'first chunk read', pfCorsOk:'Fetch succeeded programmatically — CORS allows this origin',
+  pfCtOdd:'Content-Type looks unusual for FLV — playback may still work if the payload is real FLV',
+  pfNotSecure:'Not a secure context — WebRTC requires HTTPS (or localhost)', pfNotSecureF:'Open this page over HTTPS (or via localhost) — RTCPeerConnection only works in secure contexts.',
+  pfSecureOk:'Secure context — WebRTC allowed',
+  pfWhepNote:'No probe request is sent — a WHEP POST creates a real session on the server, so it happens only when you press Play',
+  pfNoBrowser:'Browsers cannot fetch RTMP/RTSP — use the command-line assist on the right',
+  pfBlockedT:'Fetch blocked', pfBlockedF:'Typical causes: missing CORS headers (see Error reference → cors), mixed content, DNS failure, or the server being offline. VLC ignores CORS, so it may still play there.',
+  stChecking:'checking…', stConnecting:'connecting…', stLoading:'loading…', assistOnly:'command-line assist',
+  logStart:'Start pulling', ovLoading:'Loading & parsing…',
+  ovVariants:'Variants (EXT-X-STREAM-INF)', ovRenditions:'Renditions (EXT-X-MEDIA)', ovType:'Type', ovName:'Name', ovGroups:'Groups', ovEnc:'Encrypted', ovSegStats:'Segments', ovMediaInfo:'Container media info',
+  segDur:'Dur (s)', segEnc:'Enc', segShown:'Showing {n} of {t} segments',
+  mpdType:'Stream', mpdBw:'Bandwidth', mpdRes:'Resolution',
+  mcMeasured:'Measured bitrate', mcBuffer:'Buffer ahead', mcDropped:'Dropped frames', mcLatency:'Latency', mcSpeed:'Throughput', mcLost:'Packets lost', mcLevel:'Level',
+  engineFail:'Engine failed to start', libFail:'Engine library failed to load (CDN blocked?)',
+  whepState:'Connection', detected:'detected',
+  efAll:'All', efNative:'Native', efBrowser:'Browser generic',
+  errCode:'Code', errSev:'Severity', errCause:'Typical cause', errFix:'How to fix',
+  cmpProto:'Protocol', cmpLat:'Typical latency', cmpTrans:'Transport', cmpBrowser:'Browser playback', cmpUse:'Best for',
+  pfMp4NoCors:'native <video> playback does not require CORS — this only means the URL cannot be probed programmatically'
+},
+zh:{
+  navGuide:'使用指南', h1a:'直播拉流在线调试工具',
+  sub:'粘贴拉流地址即可播放并专业级排障:连接性与 CORS 体检、m3u8/MPD 清单解析、码率/缓冲/丢帧实时指标、完整引擎事件日志、错误码对照库。所有解析与播放均在本地浏览器完成。',
+  btnPull:'拉流播放', btnStop:'停止', btnReload:'重新加载', btnShare:'分享链接',
+  fmtAuto:'自动识别', kbdFocus:'聚焦输入框', kbdPlay:'播放',
+  optWorker:'Worker 解复用', optLL:'低延迟模式', optStart:'起始清晰度', optAuto:'自动 (ABR)', optLowest:'最低', optHighest:'最高', optMaxBuf:'最大缓冲',
+  optLive:'直播流', optStash:'启用 stash 缓冲(更流畅,增加延迟)', flvHint:'引擎:mpegts.js — 同样支持 HTTP / WebSocket 上的 .ts 流',
+  optAbr:'自动码率 (ABR)', dashHint:'引擎:dash.js 4',
+  optIce:'ICE 服务器', whepHint:'标准 WHEP:POST SDP offer → 201 SDP answer · 支持 webrtc://(SRS)自动转换',
+  lblDemo:'演示流', lblHistory:'最近播放', btnClearHist:'清空',
+  phPlayer:'播放器空闲 — 在上方粘贴拉流地址,点击「拉流播放」',
+  hPreflight:'连接体检', btnRecheck:'重新检测', pfIdle:'点击「拉流播放」后会自动运行体检。',
+  hSummary:'流信息摘要', btnCopyReport:'复制报告',
+  kStatus:'状态', kFormat:'格式', kEngine:'引擎', kType:'流类型', kDuration:'时长 / 窗口',
+  npWhy:'浏览器无法直接拉取 RTMP/RTSP(Flash 退场后已无协议支持)。最快的解决路径:',
+  tabOverview:'概览', tabManifest:'清单', tabMetrics:'指标', tabLogs:'日志', tabErrors:'错误对照', tabGuide:'指南',
+  ovEmpty:'加载一路流后,这里会展示其解析结构:清晰度/音轨、编解码、加密方式、分片统计与引擎信息。',
+  hManifest:'清单文件', btnCopy:'复制', lblVariants:'子清单(点击加载)', mfEmpty:'加载流之后,清单原文会显示在这里。',
+  hSegments:'分片列表(来自清单)', hRepresentations:'表示(Representations)',
+  hMetrics:'实时指标', metricsHint:'播放期间每 1 秒采样一次',
+  spBitrate:'实测视频码率', spBuffer:'缓冲余量', spRanges:'缓冲区间',
+  lgInfo:'信息', lgOk:'正常', lgWarn:'警告', lgErr:'错误', btnCopyLogs:'复制', btnDlLogs:'下载', btnClearLogs:'清空',
+  logEmpty:'暂无事件 — 引擎、网络与解析消息会显示在这里。',
+  errIntro:'各引擎错误码的离线对照手册,含典型原因与修复方法。线上报错时,概览页会直接链接到对应条目。',
+  hCompare:'协议对比', hWorkflow:'排障流程',
+  wf1b:'粘贴地址。', wf1:'Stream Inspector 根据扩展名与协议自动识别格式,需要时可用选择器手动覆盖。',
+  wf2b:'查看连接体检。', wf2:'连通性、CORS、混合内容与清单有效性在播放器启动前就已验证——「VLC 能放、浏览器不行」多半是 CORS。',
+  wf3b:'检查清单页。', wf3:'确认清晰度与编解码、加密(EXT-X-KEY / ContentProtection)、LL-HLS 分片、直播/点播类型,并能一键跳转子清单。',
+  wf4b:'播放时盯住指标页。', wf4:'实测码率、缓冲余量、丢帧,以及 WHEP 的 RTT/丢包,能暴露带宽与推流端的问题。',
+  wf5b:'在日志中追踪第一条错误。', wf5:'按严重级别过滤,再到错误对照页查该代码的原因与修复。',
+  hRtmpAssist:'浏览器中的 RTMP / RTSP', rtmpAssist:'浏览器放弃 Flash 后已无法原生拉取 RTMP/RTSP。可用 ffplay/VLC 本地播放,或在边缘用网关转协议。在格式选择器里选 RTMP/RTSP 并填入地址,即可生成可直接运行的命令。',
+  hFaq:'常见问题',
+  fq1:'可以调试哪些拉流格式?', fa1:'HLS(.m3u8,含 LL-HLS 与 Safari 原生播放)、HTTP-FLV 与 MPEG-TS、MPEG-DASH(.mpd)、WHEP 标准的 WebRTC,以及原生 MP4/WebM。RTMP 与 RTSP 提供地址校验和可直接运行的命令行辅助。',
+  fq2:'为什么流在这里失败,VLC / ffplay 却能播?', fa2:'几乎都是 CORS。浏览器侧播放器(hls.js、mpegts.js、dash.js)用 JS 拉流,要求服务端返回 Access-Control-Allow-Origin;VLC 完全不理会 CORS。连接体检会精确指出是哪个请求被拦。',
+  fq3:'为什么浏览器不能直接播 RTMP / RTSP?', fa3:'浏览器只解码 HTML5 media / MSE 支持的格式,从未实现 RTMP 与 RTSP 协议。请用 SRS、nginx-http-flv-module、MediaMTX 或 go2rtc 在边缘转换为 HTTP-FLV、HLS 或 WebRTC/WHEP。',
+  fq4:'我的拉流地址会被上传吗?', fa4:'不会。解析、探测、播放全部在本地浏览器完成——浏览器直连你自己的流媒体服务器。历史记录仅存于 localStorage,可一键清空。',
+  fq5:'各协议延迟大概多少?', fa5:'WebRTC (WHEP) <1 秒 · HTTP-FLV / MPEG-TS 1–3 秒 · LL-HLS 2–5 秒 · HLS / DASH 6–30 秒 · RTSP 0.5–2 秒(仅本地播放器)。详见上方对比表。',
+  footPrivacy:'🔒 纯前端运行:地址由你的浏览器直接拉取,不经任何服务器代理或存储。历史仅存 localStorage。', footOss:'开源地址',
+  title:'Stream Inspector — 直播拉流在线调试工具(HLS / HTTP-FLV / DASH / WebRTC)',
+  desc:'免费在线直播拉流调试工具,面向开发者:播放并诊断 HLS/m3u8、LL-HLS、HTTP-FLV、MPEG-TS、DASH、WebRTC WHEP。清单/MPD 解析、实时码率缓冲指标、事件日志、CORS 检测,纯本地运行。',
+  noUrl:'请先输入拉流地址', copied:'已复制 ✓', copiedLink:'分享链接已复制 ✓', errLookup:'查看修复方法',
+  pfTimeout:'请求超时', pfBlocked:'请求被拦截 — CORS / DNS / 混合内容 / 网络不可达', pfBadUrl:'URL 无效 — 需要带协议(https://…)',
+  pfMixed:'混合内容:HTTPS 页面无法拉取 http:// 流', wfMixedT:'混合内容被拦截', wfMixedF:'请为流开启 HTTPS,或临时用 http:// / localhost 打开本页测试。',
+  pfNoMixed:'无混合内容问题', pfPageHttp:'本页自身是 http:// — 测试无碍',
+  pfNativeOnly:'MSE 不可用 — 仅能 Safari 原生播放(诊断能力有限)',
+  pfHttp:'HTTP {s} — 请检查 URL、鉴权与防盗链', pfMfOk:'清单拉取成功', pfNotM3u8:'响应不是合法的 M3U8 清单(可能是 HTML 错误页)',
+  pfMaster:'主清单,含 {n} 条子流:', pfMediaPl:'媒体清单', pfSegs:'个分片', pfEnc:'流已加密 — KEY 方法 {m}', pfLL:'检测到低延迟 HLS(EXT-X-PART)', pfMap:'存在 fMP4 初始化分片(EXT-X-MAP)',
+  pfNotXml:'响应不是合法的 XML/MPD', pfDur:'时长', pfShift:'时移窗口',
+  pfReach:'端点可达', pfFirstChunk:'已读取首块数据', pfCorsOk:'程序化 fetch 成功 — CORS 放行本 origin',
+  pfCtOdd:'Content-Type 对 FLV 来说不太常见 — 若载荷确为 FLV 仍可能正常播放',
+  pfNotSecure:'非安全上下文 — WebRTC 要求 HTTPS(或 localhost)', pfNotSecureF:'请用 HTTPS(或 localhost)打开本页 —— RTCPeerConnection 仅在安全上下文可用。',
+  pfSecureOk:'安全上下文 — 允许 WebRTC',
+  pfWhepNote:'不做预探测请求 — WHEP 的 POST 会在服务端创建真实会话,仅在点击「拉流播放」时发生',
+  pfNoBrowser:'浏览器无法拉取 RTMP/RTSP — 请使用右侧命令行辅助',
+  pfBlockedT:'请求被拦截', pfBlockedF:'典型原因:CORS 响应头缺失(见错误对照 → cors)、混合内容、DNS 解析失败或服务器离线。VLC 不受 CORS 限制,可能仍能播放。',
+  stChecking:'检测中…', stConnecting:'连接中…', stLoading:'加载中…', assistOnly:'命令行辅助',
+  logStart:'开始拉流', ovLoading:'加载并解析中…',
+  ovVariants:'子流(EXT-X-STREAM-INF)', ovRenditions:'媒体轨(EXT-X-MEDIA)', ovType:'类型', ovName:'名称', ovGroups:'分组', ovEnc:'已加密', ovSegStats:'分片', ovMediaInfo:'容器媒体信息',
+  segDur:'时长 (s)', segEnc:'加密', segShown:'共 {t} 个分片,当前显示前 {n} 个',
+  mpdType:'流类型', mpdBw:'带宽', mpdRes:'分辨率',
+  mcMeasured:'实测码率', mcBuffer:'缓冲余量', mcDropped:'丢帧', mcLatency:'延迟', mcSpeed:'吞吐速度', mcLost:'丢包', mcLevel:'清晰度档位',
+  engineFail:'引擎启动失败', libFail:'引擎库加载失败(CDN 被拦?)',
+  whepState:'连接状态', detected:'已识别',
+  efAll:'全部', efNative:'原生播放器', efBrowser:'浏览器通用',
+  errCode:'错误码', errSev:'级别', errCause:'典型原因', errFix:'修复方法',
+  cmpProto:'协议', cmpLat:'典型延迟', cmpTrans:'传输方式', cmpBrowser:'浏览器播放', cmpUse:'适用场景',
+  pfMp4NoCors:'原生 <video> 播放不需要 CORS — 这仅表示无法以编程方式探测该地址'
+}};
+const t = k => (I18N[LANG] && I18N[LANG][k]) || I18N.en[k] || k;
+let LANG = document.documentElement.lang || 'en';
+
+/* ============ basics ============ */
+const $ = id => document.getElementById(id);
+const video = $('video');
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtBytes = b => b>=1048576?(b/1048576).toFixed(2)+' MB':b>=1024?(b/1024).toFixed(1)+' KB':b+' B';
+const fmtKbps = k => k>=1000?(k/1000).toFixed(2)+' Mbps':Math.round(k)+' kbps';
+const fmtDur = s => !isFinite(s)?'∞':(s>=3600?`${Math.floor(s/3600)}h ${Math.floor(s%3600/60)}m ${Math.round(s%60)}s`:s>=60?`${Math.floor(s/60)}m ${Math.round(s%60)}s`:(+s).toFixed(1)+'s');
+const nowStr = () => { const d=new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`; };
+let toastTimer=null;
+function toast(msg){ const el=$('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2200); }
+async function copyText(txt){
+  try{ await navigator.clipboard.writeText(txt); }
+  catch(e){ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(_){} ta.remove(); }
+}
+function resolveURL(u,base){ try{ return new URL(u,base).href; }catch(e){ return u; } }
+
+/* ============ state ============ */
+const FMT_META = {
+  hls:{label:'HLS', color:'#22d3ee', engine:'hls.js', playable:true},
+  llhls:{label:'LL-HLS', color:'#22d3ee', engine:'hls.js', playable:true},
+  flv:{label:'HTTP-FLV', color:'#34d399', engine:'mpegts.js', playable:true},
+  ts:{label:'MPEG-TS', color:'#2dd4bf', engine:'mpegts.js', playable:true},
+  dash:{label:'DASH', color:'#a78bfa', engine:'dash.js', playable:true},
+  whep:{label:'WHEP', color:'#f472b6', engine:'WebRTC', playable:true},
+  mp4:{label:'NATIVE', color:'#fbbf24', engine:'<video>', playable:true},
+  rtmp:{label:'RTMP', color:'#f87171', engine:'—', playable:false},
+  rtsp:{label:'RTSP', color:'#94a3b8', engine:'—', playable:false},
+};
+const DEMOS = [
+  {url:'https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8', fmt:'hls'},
+  {url:'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8', fmt:'hls'},
+  {url:'https://d2zihajmogu5jn.cloudfront.net/bipbop-advanced/bipbop_16x9_variant.m3u8', fmt:'hls'},
+  {url:'https://test-streams.mux.dev/tos_ismc/main.m3u8', fmt:'hls'},
+  {url:'https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd', fmt:'dash'},
+  {url:'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4', fmt:'mp4'},
+];
+const state = {
+  url:'', fmt:null, engineType:null, player:null, hls:null, dash:null, mpegts:null, whepPc:null, whepLoc:null, whepStats:{},
+  parsed:null, mpd:null, live:false, playing:false, statsTimer:null, measuring:{bps:0,ema:0}, lastLevelBw:0,
+  sparkB:[], sparkBuf:[], log:[], recovering:0, pfDone:false, startTs:0,
+};
+window.__SI = state; /* debug handle for power users */
+
+/* ============ logging ============ */
+function log(tag,msg,lvl='info'){
+  const e={ts:nowStr(),tag,msg:String(msg),lvl};
+  state.log.push(e); if(state.log.length>800) state.log.splice(0,state.log.length-800);
+  const cnt=$('logCount'); cnt.textContent=state.log.length;
+  if(lvl==='err'){ cnt.classList.add('bad'); state.errCount=(state.errCount||0)+1; }
+  renderLogRow(e);
+}
+function logPasses(e){
+  const lvlOK={info:$('lgInfo').checked,ok:$('lgOk').checked,warn:$('lgWarn').checked,err:$('lgErr').checked};
+  if(!lvlOK[e.lvl]) return false;
+  const q=$('logFilter').value.trim().toLowerCase();
+  if(q && !(e.msg+' '+e.tag).toLowerCase().includes(q)) return false;
+  return true;
+}
+function renderLogRow(e){
+  const list=$('logList'); const empty=list.querySelector('.log-empty'); if(empty) empty.remove();
+  if(!logPasses(e)) return;
+  const nearBottom = list.scrollTop+list.clientHeight >= list.scrollHeight-40;
+  const row=document.createElement('div'); row.className='log-row '+e.lvl;
+  row.innerHTML=`<span class="lt">${e.ts}</span><span class="ltag">${esc(e.tag)}</span><span class="lmsg">${esc(e.msg)}</span>`;
+  list.appendChild(row);
+  while(list.children.length>800) list.firstChild.remove();
+  if(nearBottom) list.scrollTop=list.scrollHeight;
+}
+function rerenderLogs(){ const list=$('logList'); list.innerHTML=''; state.log.forEach(renderLogRow); if(!state.log.length) list.innerHTML='<div class="log-empty">…</div>'; }
+
+/* ============ format detect ============ */
+function detectFormat(url){
+  const u=(url||'').trim(); if(!u) return null;
+  const low=u.toLowerCase(), path=low.split('?')[0].split('#')[0];
+  if(low.startsWith('rtmp://')||low.startsWith('rtmps://')) return 'rtmp';
+  if(low.startsWith('rtsp://')||low.startsWith('rtsps://')) return 'rtsp';
+  if(low.startsWith('webrtc://')||low.startsWith('whep://')) return 'whep';
+  if(low.includes('.m3u8')) return 'hls';
+  if(path.endsWith('.mpd')||low.includes('.mpd?')) return 'dash';
+  if(low.includes('.flv')) return 'flv';
+  if(path.endsWith('.ts')) return 'ts';
+  if(/\.(mp4|m4v|webm|mov|mp3|m4a|aac|ogg|wav)$/.test(path)) return 'mp4';
+  if(/\/whep|whep\/|type=whep|webrtc\b/i.test(u)) return 'whep';
+  return null;
+}
+function effectiveFormat(){
+  const sel=$('formatSel').value;
+  if(sel==='auto'){ const d=detectFormat($('urlInput').value); return d||'hls'; }
+  return sel==='llhls'?'hls':sel;
+}
+function updateBadge(){
+  const raw=$('urlInput').value.trim();
+  const d=detectFormat(raw);
+  const b=$('fmtBadge');
+  if(!raw){ b.textContent='URL'; b.style.color=''; b.classList.remove('on'); return; }
+  const fmt=d||'';
+  if(fmt){ b.textContent=FMT_META[fmt].label; b.style.color=FMT_META[fmt].color; b.classList.add('on'); }
+  else { b.textContent='?'; b.style.color='var(--faint)'; b.classList.remove('on'); }
+  showOpts(d||effectiveFormat());
+}
+function showOpts(fmt){
+  ['hls','flv','dash','whep','native'].forEach(k=>$('opts-'+k).classList.add('hidden'));
+  if(fmt==='hls') $('opts-hls').classList.remove('hidden');
+  else if(fmt==='flv'||fmt==='ts') $('opts-flv').classList.remove('hidden');
+  else if(fmt==='dash') $('opts-dash').classList.remove('hidden');
+  else if(fmt==='whep') $('opts-whep').classList.remove('hidden');
+}
+
+/* ============ history & share ============ */
+function loadHist(){ try{ return JSON.parse(localStorage.getItem('si_hist')||'[]'); }catch(e){ return []; } }
+function saveHist(h){ try{ localStorage.setItem('si_hist',JSON.stringify(h.slice(0,12))); }catch(e){} }
+function addHistory(url,fmt){
+  let h=loadHist().filter(x=>x.u!==url);
+  h.unshift({u:url,f:fmt,t:Date.now()}); saveHist(h); renderHistory();
+}
+function renderHistory(){
+  const h=loadHist(); const row=$('historyRow'); const wrap=$('historyChips'); wrap.innerHTML='';
+  if(!h.length){ row.classList.add('hidden'); return; }
+  row.classList.remove('hidden');
+  h.forEach(it=>{
+    const meta=FMT_META[it.f]||FMT_META.hls;
+    const chip=document.createElement('span'); chip.className='chip';
+    chip.innerHTML=`<span class="dot" style="background:${meta.color}"></span><span class="u">${esc(it.u.replace(/^https?:\/\//,''))}</span><span class="x" title="remove">✕</span>`;
+    chip.title=it.u;
+    chip.onclick=ev=>{ if(ev.target.classList.contains('x')){ saveHist(loadHist().filter(x=>x.u!==it.u)); renderHistory(); return; } $('urlInput').value=it.u; updateBadge(); startPlay(); };
+    wrap.appendChild(chip);
+  });
+}
+function b64urlEncode(s){ return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function b64urlDecode(s){ return decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/')))); }
+async function doShare(){
+  const url=$('urlInput').value.trim(); if(!url){ toast(t('noUrl')); return; }
+  const payload=b64urlEncode(JSON.stringify({u:url,f:$('formatSel').value}));
+  const link=`${location.origin}${location.pathname}?s=${payload}`;
+  await copyText(link); toast(t('copiedLink'));
+}
+
+/* ============ banners ============ */
+function showErrBanner(title,fix,detailCode){ $('errTitle').textContent=title; $('errFix').innerHTML=fix+(detailCode?` <a href="#tabs" data-jump-err="${esc(detailCode)}" style="white-space:nowrap">→ ${t('errLookup')}</a>`:''); $('errBanner').classList.remove('hidden'); }
+function showWarnBanner(title,fix){ $('warnTitle').textContent=title; $('warnFix').innerHTML=fix; $('warnBanner').classList.remove('hidden'); }
+function hideBanners(){ $('errBanner').classList.add('hidden'); $('warnBanner').classList.add('hidden'); }
+document.addEventListener('click',e=>{
+  const a=e.target.closest('[data-jump-err]'); if(!a) return;
+  e.preventDefault(); switchTab('errors');
+  const code=a.getAttribute('data-jump-err');
+  setTimeout(()=>{ const tr=document.querySelector(`tr[data-code="${CSS.escape(code)}"]`); if(tr){ tr.scrollIntoView({block:'center',behavior:'smooth'}); tr.style.background='var(--accent-dim)'; setTimeout(()=>tr.style.background='',2200);} },80);
+});
+
+/* ============ preflight ============ */
+function pfAdd(status,html){
+  (state.pfTexts=state.pfTexts||[]).push(`${status.toUpperCase()} ${html.replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ')}`);
+  const list=$('preflightList'); const li=document.createElement('li'); li.className=status;
+  const ic=status==='ok'?'✓':status==='bad'?'✕':status==='warn'?'!':'·';
+  li.innerHTML=`<span class="ic">${ic}</span><span class="t">${html}</span>`;
+  list.appendChild(li);
+}
+function pfReset(){ $('preflightList').innerHTML=''; }
+async function fetchProbe(url,{timeout=8000,headers}={}){
+  const ctrl=new AbortController(); const t0=performance.now();
+  const timer=setTimeout(()=>ctrl.abort(),timeout);
+  try{
+    const res=await fetch(url,{cache:'no-store',signal:ctrl.signal,headers:headers||{}});
+    return {res,ms:Math.round(performance.now()-t0),ctrl};
+  } finally{ clearTimeout(timer); }
+}
+function classifyFetchErr(e){
+  if(e&&e.name==='AbortError') return t('pfTimeout');
+  return t('pfBlocked'); // TypeError: CORS / DNS / mixed / offline
+}
+async function probeManifestText(url,timeout){
+  const {res,ms,ctrl}=await fetchProbe(url,{timeout});
+  const text=await res.text(); try{ await ctrl.abort(); }catch(_){}
+  return {status:res.status,ctype:res.headers.get('content-type')||'',ms,text};
+}
+async function preflight(fmt,url){
+  pfReset(); state.parsed=null; state.mpd=null;
+  let u; try{ u=new URL(url); }catch(e){ pfAdd('bad',t('pfBadUrl')); return; }
+  pfAdd('ok',`URL — host <code>${esc(u.host)}</code>${u.port?':'+esc(u.port):''}, path <code>${esc(u.pathname)}</code>${u.search?` + ${esc(u.search.slice(0,40))}…`:''}`);
+  if(location.protocol==='https:'&&u.protocol==='http:'){
+    pfAdd('bad',t('pfMixed'));
+    if(FMT_META[fmt].playable) { showWarnBanner(t('wfMixedT'),t('wfMixedF')); }
+  } else if(FMT_META[fmt].playable){
+    pfAdd('ok',`Scheme <code>${u.protocol}</code> — ${location.protocol==='https:'?t('pfNoMixed'):t('pfPageHttp')}`);
+  }
+  try{
+    if(fmt==='hls'){
+      if(!(window.Hls&&Hls.isSupported())&&video.canPlayType('application/vnd.apple.mpegurl')&&!window.MediaSource) pfAdd('warn',t('pfNativeOnly'));
+      const r=await probeManifestText(url,8000);
+      if(r.status!==200){ pfAdd('bad',t('pfHttp').replace('{s}',r.status)); return; }
+      pfAdd('ok',`${t('pfMfOk')} (${fmtBytes(r.text.length)}, ${r.ms} ms, <code>${esc(r.ctype||'—')}</code>)`);
+      const p=parseM3U8(r.text);
+      if(!p){ pfAdd('bad',t('pfNotM3u8')); return; }
+      state.parsed=p; state.rawManifest=r.text;
+      if(p.isMaster){
+        pfAdd('ok',t('pfMaster').replace('{n}',p.variants.length));
+        p.variants.slice(0,8).forEach(v=>pfAdd('ok',`&nbsp;↳ ${v.res||'?'} · ${fmtKbps(v.bw/1000)} · <code>${esc((v.codecs||'').split(',').map(c=>c.trim().split('.')[0]).join(', ')||'?')}</code>`));
+      } else {
+        pfAdd('ok',`${t('pfMediaPl')} — ${p.segments.length} ${t('pfSegs')}, ${fmtDur(p.totalDur)}, ${p.live?'LIVE':'VOD'}`);
+        if(p.keys.size) pfAdd('warn',t('pfEnc').replace('{m}',[...p.keys].join(', ')));
+        if(p.isLL) pfAdd('ok',t('pfLL'));
+        if(p.hasMap) pfAdd('ok',t('pfMap'));
+      }
+    } else if(fmt==='dash'){
+      const r=await probeManifestText(url,8000);
+      if(r.status!==200){ pfAdd('bad',t('pfHttp').replace('{s}',r.status)); return; }
+      pfAdd('ok',`${t('pfMfOk')} (${fmtBytes(r.text.length)}, ${r.ms} ms)`);
+      const m=parseMPD(r.text);
+      if(!m){ pfAdd('bad',t('pfNotXml')); return; }
+      state.mpd=m; state.rawManifest=r.text;
+      pfAdd('ok',`MPD ${m.type==='dynamic'?'<b>dynamic (live)</b>':'static (VOD)'}${m.duration?`, ${t('pfDur')} ${esc(m.duration)}`:''}${m.timeShift?`, ${t('pfShift')} ${esc(m.timeShift)}`:''}`);
+      m.sets.forEach(s=>pfAdd('ok',`&nbsp;↳ ${esc(s.type||'?')} × ${s.reps.length}${s.drm?` · DRM(${s.drm})`:''}`));
+    } else if(fmt==='flv'||fmt==='ts'){
+      const {res,ms,ctrl}=await fetchProbe(url,{timeout:8000});
+      const reader=res.body&&res.body.getReader?res.body.getReader():null;
+      let head=0;
+      if(reader){ try{ const c=await reader.read(); head=c.value?c.value.byteLength:0; await reader.cancel(); }catch(_){} }
+      try{ await ctrl.abort(); }catch(_){}
+      if(res.status!==200){ pfAdd('bad',t('pfHttp').replace('{s}',res.status)); return; }
+      pfAdd('ok',`${t('pfReach')} (${res.status}, ${fmtBytes(head)}${head?` ${t('pfFirstChunk')}`:''}, ${ms} ms, <code>${esc(res.headers.get('content-type')||'—')}</code>)`);
+      pfAdd('ok',t('pfCorsOk'));
+      if(res.headers.get('content-type')&&fmt==='flv'&&!/flv|octet|video|mp2t/i.test(res.headers.get('content-type'))) pfAdd('warn',t('pfCtOdd'));
+    } else if(fmt==='mp4'){
+      const {res,ms}=await fetchProbe(url,{timeout:8000});
+      if(res.status!==200){ pfAdd('bad',t('pfHttp').replace('{s}',res.status)); return; }
+      pfAdd('ok',`${t('pfReach')} (${res.status}, ${ms} ms, <code>${esc(res.headers.get('content-type')||'—')}</code>)`);
+    } else if(fmt==='whep'){
+      if(!window.isSecureContext) pfAdd('bad',t('pfNotSecure'));
+      else pfAdd('ok',t('pfSecureOk'));
+      pfAdd('warn',t('pfWhepNote'));
+    } else { // rtmp / rtsp
+      pfAdd('warn',t('pfNoBrowser'));
+    }
+  }catch(e){
+    if(fmt==='mp4'){ pfAdd('warn',classifyFetchErr(e)+` <code>${esc(e.message||e.name||'')}</code> — ${t('pfMp4NoCors')}`); }
+    else{
+      pfAdd('bad',classifyFetchErr(e)+` <code>${esc(e.message||e.name||'')}</code>`);
+      if(fmt==='hls'||fmt==='dash') showWarnBanner(t('pfBlockedT'),t('pfBlockedF'));
+    }
+  }
+}
+
+/* ============ m3u8 / mpd parsing ============ */
+function parseAttrs(s){
+  const out={}; const re=/([A-Z0-9\-]+)=("[^"]*"|[^,]*)/g; let m;
+  while((m=re.exec(s))) out[m[1]]=m[2].replace(/^"|"$/g,'');
+  return out;
+}
+function parseM3U8(text){
+  const lines=text.split(/\r?\n/);
+  if(!/#EXTM3U/.test(lines[0]||'')&&!/#EXTM3U/.test(lines[1]||'')) return null;
+  const r={isMaster:false,version:0,targetDuration:0,mediaSequence:0,playlistType:'',endlist:false,
+    variants:[],medias:[],segments:[],totalDur:0,isLL:false,keys:new Set(),hasMap:false,serverControl:{},iFramesOnly:false};
+  let cur=null, segDur=0, segTitle='', map=null, key=null, disc=false;
+  for(let raw of lines){
+    const line=raw.trim(); if(!line||line.startsWith('#EXTM3U')) continue;
+    const ci=line.indexOf(':'), tag=ci>0?line.slice(1,ci):line.slice(1), val=ci>0?line.slice(ci+1):'';
+    if(tag==='EXT-X-VERSION') r.version=+val||0;
+    else if(tag==='EXT-X-TARGETDURATION') r.targetDuration=+val||0;
+    else if(tag==='EXT-X-MEDIA-SEQUENCE') r.mediaSequence=+val||0;
+    else if(tag==='EXT-X-PLAYLIST-TYPE') r.playlistType=val;
+    else if(tag==='EXT-X-ENDLIST') r.endlist=true;
+    else if(tag==='EXT-X-I-FRAMES-ONLY') r.iFramesOnly=true;
+    else if(tag==='EXT-X-PART-INF'||tag==='EXT-X-PART') r.isLL=true;
+    else if(tag==='EXT-X-SERVER-CONTROL') r.serverControl=parseAttrs(val);
+    else if(tag==='EXT-X-KEY'){ key=parseAttrs(val); if(key.METHOD) r.keys.add(key.METHOD); }
+    else if(tag==='EXT-X-MAP'){ map=parseAttrs(val); r.hasMap=true; }
+    else if(tag==='EXT-X-MEDIA'){ const a=parseAttrs(val); r.medias.push({type:a.TYPE||'',name:a.NAME||'',lang:a.LANGUAGE||'',def:a.DEFAULT==='YES',uri:a.URI||''}); }
+    else if(tag==='EXT-X-STREAM-INF'){ const a=parseAttrs(val); r.isMaster=true; cur={bw:+a.BANDWIDTH||0,avgBw:+a['AVERAGE-BANDWIDTH']||0,res:a.RESOLUTION||'',codecs:a.CODECS||'',fps:a['FRAME-RATE']||'',audio:a.AUDIO||'',subs:a.SUBTITLES||'',cc:a['CLOSED-CAPTIONS']||'',uri:''}; }
+    else if(tag==='EXTINF'){ const v=val.split(','); segDur=parseFloat(v[0])||0; segTitle=v.slice(1).join(',').trim(); }
+    else if(tag==='EXT-X-DISCONTINUITY') disc=true;
+    else if(!line.startsWith('#')){
+      if(r.isMaster&&cur){ cur.uri=line; r.variants.push(cur); cur=null; }
+      else if(!r.isMaster){
+        if(r.segments.length<5000){ r.segments.push({seq:r.mediaSequence+r.segments.length,dur:segDur,title:segTitle,uri:line,mapUri:map?map.URI:'',keyMethod:key?key.METHOD:'',disc}); r.totalDur+=segDur; }
+        segDur=0; segTitle=''; disc=false;
+      }
+    }
+  }
+  r.live=!r.endlist&&!r.isMaster;
+  if(!r.targetDuration&&r.segments.length){ r.targetDuration=Math.max(...r.segments.map(s=>Math.ceil(s.dur))); }
+  return r;
+}
+function parseMPD(text){
+  let doc; try{ doc=new DOMParser().parseFromString(text,'application/xml'); }catch(e){ return null; }
+  if(doc.querySelector('parsererror')) return null;
+  const root=doc.documentElement, g=n=>root.getAttribute(n);
+  const mpd={profiles:g('profiles')||'',type:g('type')||'static',duration:g('mediaPresentationDuration')||'',minUpdate:g('minimumUpdatePeriod')||'',availStart:g('availabilityStartTime')||'',timeShift:g('timeShiftBufferDepth')||'',sugDelay:g('suggestedPresentationDelay')||'',sets:[]};
+  root.querySelectorAll('AdaptationSet').forEach(as=>{
+    const reps=[]; as.querySelectorAll('Representation').forEach(rep=>reps.push({id:rep.getAttribute('id')||'',bw:+rep.getAttribute('bandwidth')||0,res:rep.getAttribute('width')?rep.getAttribute('width')+'×'+rep.getAttribute('height'):'',codecs:rep.getAttribute('codecs')||'',fps:rep.getAttribute('frameRate')||'',sr:rep.getAttribute('audioSamplingRate')||''}));
+    const type=as.getAttribute('contentType')||(as.getAttribute('mimeType')||'').split('/')[0]||'';
+    mpd.sets.push({type,drm:as.querySelectorAll('ContentProtection').length,lang:as.getAttribute('lang')||'',reps});
+  });
+  return mpd;
+}
+
+/* ============ manifest pane ============ */
+function renderManifestPane(){
+  const raw=$('manifestRaw'), meta=$('manifestMeta');
+  const segWrap=$('segWrap'), mpdWrap=$('mpdWrap');
+  $('variantNav').classList.add('hidden');
+  segWrap.classList.add('hidden'); mpdWrap.classList.add('hidden');
+  if(state.rawManifest){ raw.textContent=state.rawManifest; }
+  if(state.fmt==='hls'&&state.parsed){
+    const p=state.parsed;
+    meta.textContent=`m3u8 · v${p.version||'?'} · ${p.isMaster?'master':'media'} · ${p.live?'LIVE':'VOD'}${p.isLL?' · LL-HLS':''}`;
+    if(p.isMaster&&p.variants.length){
+      $('variantNav').classList.remove('hidden'); const w=$('variantChips'); w.innerHTML='';
+      p.variants.forEach((v,i)=>{
+        const chip=document.createElement('span'); chip.className='chip';
+        const h=v.res?v.res.split('x')[1]+'p':Math.round(v.bw/1000)+'k';
+        chip.innerHTML=`<span class="dot" style="background:${FMT_META.hls.color}"></span>${esc(h)} · ${Math.round(v.bw/1000)} kbps`;
+        chip.title=v.uri;
+        chip.onclick=()=>{ const full=resolveURL(v.uri,state.url); $('urlInput').value=full; updateBadge(); startPlay(); };
+        w.appendChild(chip);
+      });
+    }
+    if(!p.isMaster&&p.segments.length){
+      segWrap.classList.remove('hidden');
+      let html=`<thead><tr><th>#</th><th>PTS</th><th>${t('segDur')}</th><th>${t('segEnc')}</th><th>URI</th></tr></thead><tbody>`;
+      const segs=p.live?p.segments.slice(-60):p.segments.slice(0,60);
+      let pts= p.live? Math.max(0,p.totalDur-segs.reduce((a,s)=>a+s.dur,0)) : 0;
+      segs.forEach(s=>{ html+=`<tr><td class="num">${s.seq}</td><td class="num">${pts.toFixed(1)}s</td><td class="num">${s.dur.toFixed(3)}</td><td>${s.keyMethod?`<code>${esc(s.keyMethod)}</code>`:''}${s.disc?' ⚡':''}</td><td><code>${esc(s.uri.length>90?s.uri.slice(0,90)+'…':s.uri)}</code></td></tr>`; pts+=s.dur; });
+      html+='</tbody>'; $('segTable').innerHTML=html;
+      $('segNote').textContent=p.segments.length>60?t('segShown').replace('{n}',segs.length).replace('{t}',p.segments.length):'';
+    }
+  } else if(state.fmt==='dash'&&state.mpd){
+    const m=state.mpd;
+    meta.textContent=`mpd · ${m.type} · ${m.sets.reduce((a,s)=>a+s.reps.length,0)} representations`;
+    mpdWrap.classList.remove('hidden');
+    let html=`<thead><tr><th>${t('mpdType')}</th><th>Rep</th><th>${t('mpdBw')}</th><th>${t('mpdRes')}</th><th>Codecs</th><th>FPS</th><th>Hz</th></tr></thead><tbody>`;
+    m.sets.forEach(s=>s.reps.forEach((rep,i)=>{ html+=`<tr><td>${i===0?esc(s.type)+(s.drm?` <span class="sev med">DRM×${s.drm}</span>`:'')+(s.lang?` <code>${esc(s.lang)}</code>`:''):''}</td><td class="mono">${esc(rep.id)}</td><td class="num">${Math.round(rep.bw/1000)} kbps</td><td class="num">${esc(rep.res||'—')}</td><td class="mono">${esc(rep.codecs||'—')}</td><td class="num">${esc(rep.fps||'—')}</td><td class="num">${esc(rep.sr||'—')}</td></tr>`; }));
+    html+='</tbody>'; $('mpdTable').innerHTML=html;
+  } else {
+    raw.textContent=state.rawManifest||t('mfEmpty'); meta.textContent='';
+  }
+}
+
+/* ============ summary & overview ============ */
+function setSummary(k,v){ const el=$('sum'+k); if(el) el.textContent=v; }
+function renderOverview(){
+  const body=$('overviewBody'); const fmt=state.fmt;
+  if(!fmt){ return; }
+  const meta=FMT_META[fmt]; let h='';
+  const engineVer = state.hls?`hls.js v${window.Hls?Hls.version:''}`:state.dash?`dash.js v${window.dashjs?dashjs.Version:''}`:state.mpegts?`mpegts.js v${window.mpegts?mpegts.version:''}`:fmt==='whep'?'native WebRTC':meta.engine;
+  h+=`<div class="metrics-grid" style="margin-bottom:14px">
+    <div class="mcell"><div class="ml">${t('kFormat')}</div><div class="mv" style="color:${meta.color}">${meta.label}</div></div>
+    <div class="mcell"><div class="ml">${t('kEngine')}</div><div class="mv" style="font-size:13.5px">${esc(engineVer)}</div></div>
+    <div class="mcell"><div class="ml">${t('kType')}</div><div class="mv">${state.live?'<span style="color:var(--err)">LIVE</span>':'VOD'}</div></div>
+    ${state.parsed&&state.parsed.targetDuration?`<div class="mcell"><div class="ml">Target duration</div><div class="mv">${state.parsed.targetDuration}<span class="u">s</span></div></div>`:''}
+    ${state.parsed&&state.parsed.version?`<div class="mcell"><div class="ml">HLS version</div><div class="mv">${state.parsed.version}</div></div>`:''}
+    ${state.parsed&&state.parsed.isLL?`<div class="mcell"><div class="ml">Low-latency</div><div class="mv" style="color:var(--good)">LL-HLS</div></div>`:''}
+  </div>`;
+  if(fmt==='hls'&&state.parsed){
+    const p=state.parsed;
+    if(p.isMaster){
+      h+=`<h3>${t('ovVariants')} (${p.variants.length})</h3><div class="tbl-wrap"><table><thead><tr><th>${t('mpdRes')}</th><th>${t('mpdBw')}</th><th>Codecs</th><th>FPS</th><th>${t('ovGroups')}</th><th>URI</th></tr></thead><tbody>`;
+      p.variants.forEach(v=>{ h+=`<tr><td class="mono">${esc(v.res||'—')}</td><td class="num">${Math.round(v.bw/1000)} kbps${v.avgBw?` <span style="color:var(--faint)">(avg ${Math.round(v.avgBw/1000)})</span>`:''}</td><td class="mono">${esc(v.codecs||'—')}</td><td class="num">${esc(v.fps||'—')}</td><td>${[v.audio&&'audio',v.subs&&'subs'].filter(Boolean).join(', ')||'—'}</td><td><code>${esc(v.uri.length>70?v.uri.slice(0,70)+'…':v.uri)}</code></td></tr>`; });
+      h+='</tbody></table></div>';
+    }
+    if(p.medias.length){
+      h+=`<h3>${t('ovRenditions')} (${p.medias.length})</h3><div class="tbl-wrap"><table><thead><tr><th>${t('ovType')}</th><th>${t('ovName')}</th><th>Lang</th><th>URI</th></tr></thead><tbody>`;
+      p.medias.forEach(m=>{ h+=`<tr><td class="mono">${esc(m.type)}</td><td>${esc(m.name)}</td><td class="mono">${esc(m.lang||'—')}</td><td>${m.uri?`<code>${esc(m.uri.length>60?m.uri.slice(0,60)+'…':m.uri)}</code>`:'—'}</td></tr>`; });
+      h+='</tbody></table></div>';
+    }
+    if(p.keys.size) h+=`<p style="font-size:13px;color:var(--muted)">🔐 ${t('ovEnc')}: <code>${[...p.keys].join('</code>, <code>')}</code>${p.segments[0]&&p.segments[0].keyMethod?'':''}</p>`;
+    if(!p.isMaster) h+=`<p style="font-size:13px;color:var(--muted)">${t('ovSegStats')}: ${p.segments.length} · Σ ${fmtDur(p.totalDur)}${p.hasMap?' · fMP4 (EXT-X-MAP)':''}${p.playlistType?` · type ${esc(p.playlistType)}`:''}</p>`;
+  }
+  if(fmt==='dash'&&state.mpd){
+    const m=state.mpd;
+    h+=`<div class="metrics-grid" style="margin-bottom:14px">
+      ${m.duration?`<div class="mcell"><div class="ml">${t('kDuration')}</div><div class="mv" style="font-size:13px">${esc(m.duration)}</div></div>`:''}
+      ${m.timeShift?`<div class="mcell"><div class="ml">TimeShift</div><div class="mv" style="font-size:13px">${esc(m.timeShift)}</div></div>`:''}
+      ${m.minUpdate?`<div class="mcell"><div class="ml">Min update</div><div class="mv" style="font-size:13px">${esc(m.minUpdate)}</div></div>`:''}
+    </div>`;
+    h+=`<h3>${t('hRepresentations')}</h3><div class="tbl-wrap"><table><thead><tr><th>${t('mpdType')}</th><th>Rep</th><th>${t('mpdBw')}</th><th>${t('mpdRes')}</th><th>Codecs</th><th>FPS</th></tr></thead><tbody>`;
+    m.sets.forEach(s=>s.reps.forEach((rep,i)=>{ h+=`<tr><td>${i===0?esc(s.type)+(s.drm?` <span class="sev med">DRM×${s.drm}</span>`:''):''}</td><td class="mono">${esc(rep.id)}</td><td class="num">${Math.round(rep.bw/1000)} kbps</td><td class="num">${esc(rep.res||'—')}</td><td class="mono">${esc(rep.codecs||'—')}</td><td class="num">${esc(rep.fps||'—')}</td></tr>`; }));
+    h+='</tbody></table></div>';
+  }
+  if((fmt==='flv'||fmt==='ts')&&state.flvInfo){
+    const mi=state.flvInfo;
+    h+=`<h3>${t('ovMediaInfo')}</h3><div class="metrics-grid">
+      <div class="mcell"><div class="ml">Video</div><div class="mv" style="font-size:13.5px">${esc(mi.videoCodec||'—')}</div></div>
+      <div class="mcell"><div class="ml">${t('mpdRes')}</div><div class="mv">${mi.width?mi.width+'×'+mi.height:'—'}</div></div>
+      <div class="mcell"><div class="ml">FPS</div><div class="mv">${esc(String(mi.fps||'—'))}</div></div>
+      <div class="mcell"><div class="ml">Audio</div><div class="mv" style="font-size:13.5px">${esc(mi.audioCodec||'—')}${mi.audioSampleRate?' @'+mi.audioSampleRate+' Hz':''}</div></div>
+    </div>`;
+  }
+  if(fmt==='hls'&&state.hls&&state.hls.levels&&state.hls.levels.length>1){
+    h+=`<h3>${t('ovLevels')}</h3><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <select class="sel" id="lvlSel"><option value="-1">${t('optAuto')}</option>${state.hls.levels.map((l,i)=>`<option value="${i}">${l.height?l.height+'p':Math.round(l.bitrate/1000)+'k'} · ${Math.round(l.bitrate/1000)} kbps</option>`).join('')}</select>
+      <span style="font-size:12px;color:var(--faint)" id="lvlNow"></span></div>`;
+  }
+  if(fmt==='whep'){
+    h+=`<div id="whepState" style="font-size:13px;color:var(--muted)">${t('whepState')}: <b id="whepStateV">new</b></div>`;
+  }
+  body.innerHTML=h;
+  const sel=$('lvlSel');
+  if(sel) sel.onchange=()=>{ const v=+sel.value; try{ state.hls.currentLevel=v; log('HLS',`level → ${v<0?'auto':state.hls.levels[v].height+'p ('+Math.round(state.hls.levels[v].bitrate/1000)+' kbps)'}`,'ok'); }catch(e){} };
+}
+
+/* ============ RTMP / RTSP assist ============ */
+function srsWebrtcToWhep(url){
+  try{
+    const m=url.replace(/^webrtc:\/\//i,'').split('?')[0].match(/^([^\/]+)(\/.+)/);
+    if(!m) return null;
+    const [hostPort,path]=m[1]?[m[1],m[2]]:[]; const hp=hostPort.split(':');
+    const host=hp[0], port=hp[1]||'1985';
+    const parts=path.split('/').filter(Boolean); const stream=parts.pop(); const app=parts.join('/')||'live';
+    return `http://${host}:${port}/rtc/v1/whep/?app=${app}&stream=${stream}`;
+  }catch(e){ return null; }
+}
+function renderNpAssist(fmt,url){
+  const card=$('nonPlayableCard'); card.classList.remove('hidden');
+  $('npTitle').textContent=fmt==='rtsp'?'RTSP assist':'RTMP assist';
+  const L={en:{
+    play:'Play locally (lowest latency)', probe:'Probe / inspect', rec:'Record a copy', vlc:'Open in VLC',
+    conv:'Convert at the edge (browser-playable)', tbl:['Gateway','RTMP/RTSP in','Browser URL out'],
+    r1:['SRS','rtmp://h:1935/live/stream','http://h:8080/live/stream.flv  ·  /live/stream.m3u8  ·  http://h:1985/rtc/v1/whep/?app=live&stream=stream'],
+    r2:['nginx-http-flv-module','rtmp://h/live/stream','http://h:8000/live/stream.flv'],
+    r3:['MediaMTX / go2rtc','rtsp://camera/stream','http://h:8888/stream  (HLL) · WebRTC WHEP page'],
+  },zh:{
+    play:'本地直接播放(延迟最低)', probe:'探测 / 查看流信息', rec:'录制一份副本', vlc:'用 VLC 打开',
+    conv:'在边缘转协议(浏览器可播)', tbl:['网关','RTMP/RTSP 输入','浏览器可播输出'],
+    r1:['SRS','rtmp://h:1935/live/stream','http://h:8080/live/stream.flv  ·  /live/stream.m3u8  ·  http://h:1985/rtc/v1/whep/?app=live&stream=stream'],
+    r2:['nginx-http-flv-module','rtmp://h/live/stream','http://h:8000/live/stream.flv'],
+    r3:['MediaMTX / go2rtc','rtsp://摄像头地址','http://h:8888/stream · WebRTC WHEP 页面'],
+  }}[LANG];
+  const cmds=[
+    [L.play,`ffplay -fflags nobuffer "${url}"`],
+    [fmt==='rtsp'?L.play+' (TCP)':L.probe,`ffmpeg -i "${url}"`],
+    [L.rec,`ffmpeg -i "${url}" -c copy "${fmt==='rtsp'?'out.mp4':'out.flv'}"`],
+    [L.vlc,`open -a VLC "${url}"   # macOS  ·  vlc "${url}"`],
+  ];
+  let h=cmds.map(c=>`<div class="cmd-block"><span class="cmd-lbl">${esc(c[0])}</span><button class="btn small copy-cmd" data-cmd="${esc(c[1])}">⧉</button><pre>${esc(c[1])}</pre></div>`).join('');
+  h+=`<p style="font-size:12.5px;color:var(--muted);margin:12px 0 6px"><b>${esc(L.conv)}</b></p><div class="tbl-wrap"><table><thead><tr>${L.tbl.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${[L.r1,L.r2,L.r3].map(r=>`<tr><td class="mono">${esc(r[0])}</td><td class="mono" style="word-break:break-all">${esc(r[1])}</td><td class="mono" style="word-break:break-all">${esc(r[2])}</td></tr>`).join('')}</tbody></table></div>`;
+  $('npBody').innerHTML=h;
+  $('npBody').querySelectorAll('[data-cmd]').forEach(b=>b.onclick=async()=>{ await copyText(b.getAttribute('data-cmd')); toast(t('copied')); });
+  if(fmt==='whep'){ /* not used */ }
+}
+/* ============ engine lib loading ============ */
+const LIBS={
+  hls:{files:['https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js','https://unpkg.com/hls.js@1/dist/hls.min.js'],glob:'Hls'},
+  dash:{files:['https://cdn.jsdelivr.net/npm/dashjs@4/dist/dash.all.min.js','https://unpkg.com/dashjs@4/dist/dash.all.min.js'],glob:'dashjs'},
+  mpegts:{files:['https://cdn.jsdelivr.net/npm/mpegts.js@1/dist/mpegts.js','https://unpkg.com/mpegts.js@1/dist/mpegts.js'],glob:'mpegts'},
+};
+const libCache={};
+function loadScript(src){ return new Promise((ok,no)=>{ const s=document.createElement('script'); s.src=src; s.onload=()=>ok(); s.onerror=()=>{ s.remove(); no(new Error('failed '+src)); }; document.head.appendChild(s); }); }
+async function loadLib(key){
+  if(libCache[key]) return libCache[key];
+  libCache[key]=(async()=>{
+    const L=LIBS[key]; if(window[L.glob]) return;
+    let lastErr;
+    for(const f of L.files){ try{ await loadScript(f); if(window[L.glob]) return; }catch(e){ lastErr=e; } }
+    throw new Error(t('libFail')+' ('+key+')');
+  })();
+  return libCache[key];
+}
+
+/* ============ play / stop ============ */
+async function startPlay(){
+  const url=$('urlInput').value.trim();
+  if(!url){ toast(t('noUrl')); return; }
+  const fmt=effectiveFormat();
+  stopAll(true);
+  state.url=url; state.fmt=fmt; state.errCount=0; state.measuring={bps:0,ema:0}; state.flvInfo=null; state.whepView=null; state.pfTexts=[];
+  state.sparkB=[]; state.sparkBuf=[]; state.log=[]; state.errCount=0;
+  $('logCount').textContent='0'; $('logCount').classList.remove('bad'); $('logList').innerHTML='<div class="log-empty">…</div>';
+  $('overviewBody').innerHTML=`<p style="color:var(--faint)">${t('ovLoading')}</p>`;
+  $('manifestRaw').textContent=t('mfEmpty'); $('manifestMeta').textContent='';
+  hideBanners(); $('nonPlayableCard').classList.add('hidden');
+  setSummary('Format',FMT_META[fmt].label); setSummary('Engine','…'); setSummary('Type','…'); setSummary('Duration','…');
+  addHistory(url,fmt);
+  $('reloadBtn').disabled=false; $('playerPh').classList.add('hidden');
+  log('APP',`${t('logStart')} [${FMT_META[fmt].label}] ${url}`,'ok');
+  if(!FMT_META[fmt].playable){
+    setSummary('Engine',t('assistOnly')); setSummary('Status','n/a'); setSummary('Type',fmt.toUpperCase());
+    await preflight(fmt,url); renderNpAssist(fmt,url);
+    renderManifestPane(); return;
+  }
+  buildCells(fmt);
+  setSummary('Status',t('stChecking'));
+  await preflight(fmt,url);
+  setSummary('Status',t('stConnecting'));
+  try{
+    if(fmt==='hls') await startHls(url);
+    else if(fmt==='dash') await startDash(url);
+    else if(fmt==='flv'||fmt==='ts') await startMpegts(url,fmt);
+    else if(fmt==='whep') await startWhep(url);
+    else startNative(url);
+  }catch(e){
+    log('ENG',e.message||String(e),'err');
+    showErrBanner(t('engineFail'),esc(e.message||''));
+    setSummary('Status','failed');
+    $('playerPh').classList.remove('hidden');
+    return;
+  }
+  state.playing=true; state.startTs=Date.now();
+  clearInterval(state.statsTimer); state.statsTimer=setInterval(tick,1000);
+  renderManifestPane();
+  setSummary('Status',t('stLoading'));
+}
+function stopAll(silent){
+  clearInterval(state.statsTimer); state.statsTimer=null; state.playing=false; state.live=false;
+  try{ if(state.hls) state.hls.destroy(); }catch(e){}
+  try{ if(state.dash) state.dash.reset(); }catch(e){}
+  try{ if(state.mpegts){ state.mpegts.unload(); state.mpegts.destroy(); } }catch(e){}
+  try{ if(state.whepPc){ if(state.whepLoc) fetch(state.whepLoc,{method:'DELETE',keepalive:true}).catch(()=>{}); state.whepPc.close(); } }catch(e){}
+  state.hls=state.dash=state.mpegts=null; state.whepPc=null; state.whepLoc=null; state.engineType=null;
+  try{ video.pause(); }catch(e){}
+  video.srcObject=null; video.removeAttribute('src'); try{ video.load(); }catch(e){}
+  $('liveBadge').classList.add('hidden'); $('playerPh').classList.remove('hidden');
+  $('chipStats').innerHTML=''; $('reloadBtn').disabled=!state.url;
+  setSummary('Status',silent?'idle':'stopped');
+}
+async function safePlay(){
+  try{ await video.play(); }
+  catch(e){
+    log('PLAY','autoplay blocked → retrying muted','warn');
+    video.muted=true;
+    try{ await video.play(); toast(LANG==='zh'?'已静音自动播放,点击视频取消静音':'Autoplay started muted — click the video to unmute'); }
+    catch(e2){ log('PLAY','play() failed: '+(e2.message||''),'err'); }
+  }
+}
+
+/* ============ engines ============ */
+async function startHls(url){
+  await loadLib('hls');
+  const H=window.Hls;
+  if(!(H&&H.isSupported())){
+    if(video.canPlayType('application/vnd.apple.mpegurl')){
+      log('HLS','hls.js MSE unavailable — native Safari HLS playback (limited diagnostics)','warn');
+      state.engineType='native HLS'; setSummary('Engine','native (Safari)');
+      video.src=url; safePlay();
+      video.addEventListener('loadedmetadata',()=>{ state.live=!isFinite(video.duration); if(state.live)$('liveBadge').classList.remove('hidden'); setSummary('Type',state.live?'LIVE':'VOD'); },{once:true});
+      return;
+    }
+    throw new Error('MSE is not supported in this browser — cannot play HLS (iOS Safari: use its native player)');
+  }
+  const o={worker:$('optHlsWorker').checked,ll:$('optHlsLL').checked,start:+$('optHlsStart').value,buf:+$('optHlsBuf').value};
+  const hls=new H({enableWorker:o.worker,lowLatencyMode:o.ll,maxBufferLength:o.buf,backBufferLength:30,startLevel:o.start===999?-1:o.start});
+  state.hls=hls; state.engineType='hls.js'; setSummary('Engine','hls.js v'+H.version);
+  hls.on(H.Events.MANIFEST_PARSED,(e,d)=>{
+    log('HLS',`manifest parsed — ${d.levels.length} variants, first level #${d.firstLevel}`,'ok');
+    if(o.start===999&&d.levels.length) try{ hls.currentLevel=d.levels.length-1; }catch(x){}
+    renderOverview();
+  });
+  hls.on(H.Events.LEVEL_LOADED,(e,d)=>{
+    const det=d.details||{}; state.live=!!det.live;
+    if(state.live)$('liveBadge').classList.remove('hidden'); else $('liveBadge').classList.add('hidden');
+    setSummary('Type',det.live?'LIVE':'VOD'); setSummary('Duration',det.live?(LANG==='zh'?'直播窗口':'live window'):'Σ '+fmtDur(det.totalduration||0));
+    log('HLS',`level #${d.level} loaded — ${det.fragments?det.fragments.length:0} frags, live=${!!det.live}, target=${det.targetduration||'?'}s${det.partList?' · '+det.partList.length+' parts':''}`,'info');
+  });
+  hls.on(H.Events.LEVEL_SWITCHED,(e,d)=>{
+    const l=hls.levels&&hls.levels[d.level]; if(l) state.lastLevelBw=l.bitrate;
+    log('HLS',`switched → #${d.level}${l?` ${l.height?l.height+'p ':''}(${Math.round(l.bitrate/1000)} kbps)`:''}`,'ok');
+    const n=$('lvlNow'); if(n) n.textContent=`current: #${d.level}${l?` ${l.height?l.height+'p ':''}${Math.round(l.bitrate/1000)} kbps`:''}`;
+    const s=$('lvlSel'); if(s&&s.value!==String(d.level)) s.value=String(d.level);
+  });
+  hls.on(H.Events.FRAG_BUFFERED,(e,d)=>{
+    const st=d.frag&&d.frag.stats; if(!st||!st.loading) return;
+    const dur=st.loading.end-st.loading.start||d.frag.duration*1000||1000;
+    const bps=(st.total||0)*8/(Math.max(300,dur)/1000);
+    state.measuring.ema=state.measuring.ema?state.measuring.ema*0.6+bps*0.4:bps;
+    if(!state.measuring.bps){ state.measuring.bps=bps; log('HLS',`first fragment buffered (sn ${d.frag.sn}) — stream is flowing`,'ok'); }
+  });
+  hls.on(H.Events.ERROR,(e,d)=>onHlsError(d));
+  hls.on(H.Events.MEDIA_ATTACHED,()=>safePlay());
+  hls.loadSource(url); hls.attachMedia(video);
+}
+function onHlsError(d){
+  if(d.details==='aborted'&&!d.fatal){ log('HLS','fragment aborted (level switch / seek) — normal','warn'); return; }
+  const ref=ERR_DB.find(r=>r.cat==='hls'&&r.code===d.details);
+  const cause=ref?(LANG==='zh'?ref.zh.c:ref.en.c):'';
+  log('HLS',`${d.details}${d.response&&d.response.code?` (HTTP ${d.response.code})`:''} fatal=${!!d.fatal}${cause?' — '+cause:''}`,'err');
+  if(d.fatal){
+    if(d.type===Hls.ErrorTypes.NETWORK_ERROR_TYPE&&state.recovering<2){
+      state.recovering++; log('HLS','auto-recovery: startLoad() #'+state.recovering,'warn'); try{ state.hls.startLoad(); }catch(e){}
+    } else if(d.type===Hls.ErrorTypes.MEDIA_ERROR_TYPE&&state.recovering<4){
+      state.recovering++; log('HLS','auto-recovery: recoverMediaError() #'+state.recovering,'warn'); try{ state.hls.recoverMediaError(); }catch(e){}
+    } else {
+      setSummary('Status','failed');
+      showErrBanner('HLS: '+d.details, ref?(LANG==='zh'?ref.zh.f:ref.en.f):'', d.details);
+    }
+  }
+}
+async function startDash(url){
+  await loadLib('dash');
+  const D=window.dashjs, p=D.MediaPlayer().create();
+  state.dash=p; state.engineType='dash.js'; setSummary('Engine','dash.js v'+D.Version);
+  p.updateSettings({streaming:{buffer:{fastSwitchEnabled:true},abr:{autoSwitchBitrate:{video:$('optDashAbr').checked}}}});
+  const EV=D.MediaPlayer.events;
+  [['MANIFEST_LOADED','manifest loaded','ok'],['PLAYBACK_STARTED','playback started','ok'],['BUFFER_LOADED','buffer ready','info'],['BUFFER_EMPTY','buffer empty — possible stall','warn'],['QUALITY_CHANGE_RENDERED',null,'ok']].forEach(([name,msg,lvl])=>{
+    if(EV[name]===undefined) return;
+    p.on(EV[name],e=>{
+      if(name==='QUALITY_CHANGE_RENDERED'){ log('DASH',`quality → ${e.mediaType||'?'} #${e.newQuality!=null?e.newQuality:'?'}`,lvl); return; }
+      log('DASH',msg,lvl);
+    });
+  });
+  if(EV.ERROR) p.on(EV.ERROR,e=>{
+    const err=e.error||{}; const msg=(err.event&&(err.event.message||err.event.id))||err.message||'unknown';
+    log('DASH','error: '+msg,'err');
+    const ref=ERR_DB.find(r=>r.cat==='dash'&&String(msg).toLowerCase().includes(r.code));
+    showErrBanner('DASH: '+msg, ref?(LANG==='zh'?ref.zh.f:ref.en.f):'');
+  });
+  p.initialize(video,url,true);
+}
+async function startMpegts(url,fmt){
+  await loadLib('mpegts');
+  const M=window.mpegts;
+  try{ if(!M.getFeatureList().mseLivePlayback) log('MPEGTS','MSE live playback unavailable in this browser','warn'); }catch(e){}
+  const isLive=$('optFlvLive').checked, stash=$('optFlvStash').checked;
+  const player=M.createPlayer({type:fmt==='ts'?'mpegts':'flv',isLive,url},{enableStashBuffer:stash,liveBufferLatencyChasing:isLive&&!stash,lazyLoad:!isLive});
+  state.mpegts=player; state.engineType='mpegts.js'; setSummary('Engine','mpegts.js v'+M.version);
+  player.on(M.Events.MEDIA_INFO,e=>{
+    const mi=e.mediaInfo||e.data||{}; state.flvInfo=mi;
+    log('MPEGTS',`media info — video: ${mi.videoCodec||'?'} ${mi.width||'?'}×${mi.height||'?'}@${mi.fps||'?'}fps · audio: ${mi.audioCodec||'?'}`,  'ok');
+    setSummary('Type',isLive?'LIVE':'VOD'); renderOverview();
+  });
+  player.on(M.Events.STATISTICS_INFO,e=>{ const s=e.statistics||e.data||{}; if(s.speed) state.measuring.ema=s.speed*8; });
+  player.on(M.Events.ERROR,(etype,detail,info)=>{
+    log('MPEGTS',`ERROR ${etype}/${detail}: ${(info&&(info.msg||info.reason))||''}`,'err');
+    const hay=`${etype}/${detail} ${info&&info.code!=null?info.code:''} ${info&&(info.msg||info.reason)||''}`;
+    const find=c=>ERR_DB.find(r=>r.cat==='flv'&&r.code===c);
+    const ref=/403/.test(hay)?find('403'):/404/.test(hay)?find('404'):/format/i.test(hay)?find('FormatError'):/timeout/i.test(hay)?find('LoadingTimeOut'):/refus|econn/i.test(hay)?find('ConnectionRefused'):/40\d\d|5\d\d/.test(hay)?find('403'):find('LoadingInterruptedError');
+    showErrBanner(`FLV: ${detail}`, ref?(LANG==='zh'?ref.zh.f:ref.en.f):esc((info&&info.msg)||''));
+  });
+  player.on(M.Events.LOADING_COMPLETE,()=>log('MPEGTS','stream loading complete (VOD end)','ok'));
+  player.on(M.Events.RECOVERED_EARLY_EOF,()=>log('MPEGTS','early EOF — recovered','warn'));
+  player.attachMediaElement(video);
+  player.load(); player.play().catch(()=>safePlay());
+}
+async function startWhep(url){
+  let ep=url;
+  if(/^webrtc:\/\//i.test(url)){
+    const conv=srsWebrtcToWhep(url);
+    if(conv){ showWarnBanner('SRS webrtc:// '+t('detected'),`→ WHEP: <code>${esc(conv)}</code>`); log('WHEP','webrtc:// converted → '+conv,'info'); ep=conv; $('urlInput').value=conv; }
+  }
+  if(!window.isSecureContext) showWarnBanner(t('pfNotSecure'),t('pfNotSecureF'));
+  const ice=($('optIce').value||'').split(/[,\n]/).map(s=>s.trim()).filter(Boolean).map(u=>({urls:u}));
+  const pc=new RTCPeerConnection({iceServers:ice.length?ice:[{urls:'stun:stun.l.google.com:19302'}]});
+  state.whepPc=pc; state.engineType='WebRTC (WHEP)'; setSummary('Engine','native WebRTC');
+  pc.addTransceiver('video',{direction:'recvonly'});
+  pc.addTransceiver('audio',{direction:'recvonly'});
+  pc.ontrack=e=>{
+    log('WHEP',`track received: ${e.track.kind}`,'ok');
+    if(!video.srcObject){ video.srcObject=e.streams[0]||new MediaStream([e.track]); safePlay(); }
+  };
+  pc.onconnectionstatechange=()=>{
+    const s=pc.connectionState;
+    const el=$('whepStateV'); if(el) el.textContent=s;
+    setSummary('Status',s);
+    log('WHEP','connection state: '+s, s==='connected'?'ok':(s==='failed'||s==='disconnected')?'err':'info');
+    if(s==='connected'){ state.live=true; $('liveBadge').classList.remove('hidden'); }
+    if(s==='failed'){ const ref=ERR_DB.find(r=>r.code==='ice-failed'); showErrBanner('ICE connection failed', ref?(LANG==='zh'?ref.zh.f:ref.en.f):'', 'ice-failed'); }
+  };
+  const offer=await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await new Promise(res=>{
+    if(pc.iceGatheringState==='complete') return res();
+    const to=setTimeout(res,2200);
+    pc.addEventListener('icegatheringstatechange',()=>{ if(pc.iceGatheringState==='complete'){ clearTimeout(to); res(); } });
+  });
+  const nCand=(pc.localDescription.sdp.match(/a=candidate/g)||[]).length;
+  log('WHEP',`offer ready — SDP ${pc.localDescription.sdp.length} B, ${nCand} local candidates`,'info');
+  let resp;
+  try{ resp=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/sdp'},body:pc.localDescription.sdp}); }
+  catch(e){ const ref=ERR_DB.find(r=>r.code==='whep-http'); showErrBanner('WHEP fetch failed', t('pfBlockedF')+' '+(ref?(LANG==='zh'?ref.zh.f:ref.en.f):''), 'whep-http'); throw e; }
+  if(resp.status!==201&&resp.status!==204&&resp.status!==200){
+    const body=await resp.text().catch(()=> '');
+    const ref=ERR_DB.find(r=>r.code==='whep-http');
+    log('WHEP',`endpoint → HTTP ${resp.status} ${body.slice(0,200)}`,'err');
+    showErrBanner(`WHEP HTTP ${resp.status}`, ref?(LANG==='zh'?ref.zh.f:ref.en.f):esc(body.slice(0,240)), 'whep-http');
+    throw new Error('WHEP endpoint returned '+resp.status);
+  }
+  const loc=resp.headers.get('Location'); if(loc){ try{ state.whepLoc=new URL(loc,ep).href; }catch(e){} }
+  if(resp.status===204){ log('WHEP','endpoint returned 204 (no answer body) — non-standard, media may not flow','warn'); }
+  else{
+    const answer=await resp.text();
+    await pc.setRemoteDescription({type:'answer',sdp:answer});
+    log('WHEP',`answer applied (${answer.length} B) — negotiating media`,'ok');
+  }
+  renderOverview();
+}
+function startNative(url){
+  state.engineType='<video>'; setSummary('Engine','native <video>');
+  video.src=url;
+  video.addEventListener('error',()=>{
+    const code={1:'MEDIA_ERR_ABORTED',2:'MEDIA_ERR_NETWORK',3:'MEDIA_ERR_DECODE',4:'MEDIA_ERR_SRC_NOT_SUPPORTED'}[video.error&&video.error.code]||'MEDIA_ERR';
+    const ref=ERR_DB.find(r=>r.cat==='native'&&r.code===code);
+    log('VIDEO',code+': '+((video.error&&video.error.message)||''),'err');
+    showErrBanner(code, ref?(LANG==='zh'?ref.zh.f:ref.en.f):'', code);
+  });
+  video.addEventListener('loadedmetadata',()=>{
+    log('VIDEO',`metadata — ${video.videoWidth}×${video.videoHeight}, ${isFinite(video.duration)?fmtDur(video.duration):'∞ (live)'}`,'ok');
+    state.live=!isFinite(video.duration); if(state.live)$('liveBadge').classList.remove('hidden');
+    setSummary('Type',state.live?'LIVE':'VOD'); setSummary('Duration',isFinite(video.duration)?fmtDur(video.duration):'∞');
+  },{once:true});
+  safePlay();
+}
+
+/* ============ metrics ============ */
+let cellsSpec=[];
+function buildCells(fmt){
+  const C=(id,label,unit)=>({id,label,unit});
+  if(fmt==='hls') cellsSpec=[C('res','Resolution'),C('mbr',t('mcMeasured'),'kbps'),C('bw','Bandwidth est.','kbps'),C('buf',t('mcBuffer'),'s'),C('drop',t('mcDropped')),C('lvl',t('mcLevel')),C('lat',t('mcLatency'),'s')];
+  else if(fmt==='dash') cellsSpec=[C('res','Resolution'),C('mbr',t('mcMeasured'),'kbps'),C('bw','Throughput','kbps'),C('buf',t('mcBuffer'),'s'),C('drop',t('mcDropped')),C('dvr','DVR window','s')];
+  else if(fmt==='flv'||fmt==='ts') cellsSpec=[C('res','Resolution'),C('mbr',t('mcSpeed'),'kbps'),C('buf',t('mcBuffer'),'s'),C('drop',t('mcDropped')),C('cod','Codec')];
+  else if(fmt==='whep') cellsSpec=[C('res','Resolution'),C('mbr','Bitrate in','kbps'),C('rtt','RTT','ms'),C('lost',t('mcLost')),C('jit','Jitter','ms'),C('fps','FPS'),C('cod','Codec')];
+  else cellsSpec=[C('res','Resolution'),C('buf',t('mcBuffer'),'s'),C('drop',t('mcDropped')),C('rate','Rate','×')];
+  $('metricsGrid').innerHTML=cellsSpec.map(c=>`<div class="mcell"><div class="ml">${c.label}</div><div class="mv" id="mc-${c.id}">—${c.unit?`<span class="u"> ${c.unit}</span>`:''}</div></div>`).join('');
+}
+function setCell(id,val,unit){ const el=$('mc-'+id); if(!el) return; el.innerHTML=(val==null?'—':val)+(unit&&val!=null?`<span class="u"> ${unit}</span>`:''); }
+function renderChipStats(v){
+  const parts=[];
+  if(v.res&&v.res!=='—') parts.push(['📐',v.res]);
+  if(v.mbr) parts.push(['⚡',fmtKbps(v.mbr)]);
+  if(v.buf!=null) parts.push(['🛢',v.buf.toFixed(1)+' s']);
+  if(v.drop!=null) parts.push(['📉',v.drop+' dropped']);
+  if(v.lat!=null) parts.push(['⏱',v.lat.toFixed(1)+' s']);
+  $('chipStats').innerHTML=parts.map(p=>`<span class="cstat">${p[0]}<b>${esc(String(p[1]))}</b></span>`).join('');
+}
+function drawSpark(cv,data,color){
+  const dpr=devicePixelRatio||1;
+  const w=cv.clientWidth,h=cv.clientHeight;
+  if(cv.width!==w*dpr){ cv.width=w*dpr; cv.height=h*dpr; }
+  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
+  const max=Math.max(...data,1);
+  g.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--border'); g.beginPath(); g.moveTo(0,h-1); g.lineTo(w,h-1); g.stroke();
+  if(data.length<2) return;
+  g.beginPath();
+  data.forEach((v,i)=>{ const x=i/(data.length-1)*w, y=h-3-(v/max)*(h-8); i?g.lineTo(x,y):g.moveTo(x,y); });
+  g.strokeStyle=color; g.lineWidth=1.6; g.stroke();
+  g.lineTo(w,h); g.lineTo(0,h); g.closePath();
+  g.fillStyle=color+'22'; g.fill();
+}
+function drawBufferBar(){
+  const bar=$('bufferBar'); bar.querySelectorAll('.seg,.ph').forEach(x=>x.remove());
+  const t0=video.currentTime-10; const ranges=[];
+  let maxEnd=video.currentTime+1;
+  for(let i=0;i<video.buffered.length;i++){ ranges.push([video.buffered.start(i),video.buffered.end(i)]); maxEnd=Math.max(maxEnd,video.buffered.end(i)); }
+  const t1=Math.max(video.currentTime+50,maxEnd);
+  ranges.forEach(([a,b])=>{ if(b<=t0||a>=t1) return;
+    const l=Math.max(0,(a-t0)/(t1-t0)*100), r=Math.min(100,(b-t0)/(t1-t0)*100);
+    const d=document.createElement('div'); d.className='seg'; d.style.left=l+'%'; d.style.width=(r-l)+'%'; bar.appendChild(d); });
+  const ph=document.createElement('div'); ph.className='ph'; ph.style.left=Math.min(100,Math.max(0,(video.currentTime-t0)/(t1-t0)*100))+'%'; bar.appendChild(ph);
+  $('spRgNow').textContent=`${video.buffered.length} range(s) · ${fmtDur(video.currentTime)} / edge ${fmtDur(maxEnd)}`;
+}
+function tick(){
+  if(!state.playing) return;
+  const v={};
+  try{
+    v.res=video.videoWidth?video.videoWidth+'×'+video.videoHeight:null;
+    let ahead=null;
+    for(let i=0;i<video.buffered.length;i++){ if(video.buffered.start(i)<=video.currentTime&&video.currentTime<=video.buffered.end(i)) ahead=video.buffered.end(i)-video.currentTime; }
+    v.buf=ahead;
+    const q=video.getVideoPlaybackQuality?video.getVideoPlaybackQuality():(video.webkitDroppedFrameCount!=null?{droppedVideoFrames:video.webkitDroppedFrameCount}:null);
+    v.drop=q?q.droppedVideoFrames:null;
+    v.rate=video.playbackRate;
+  }catch(e){}
+  v.mbr=state.measuring.ema?state.measuring.ema/1000:null;
+  if(state.hls){ try{
+    v.bw=state.hls.bandwidthEstimate?state.hls.bandwidthEstimate/1000:null;
+    v.lvl=state.hls.currentLevel; const l=state.hls.levels&&state.hls.levels[v.lvl];
+    if(l){ v.lvlTxt=(l.height?l.height+'p ':'')+'#'+v.lvl; v.lastBwK=l.bitrate/1000; }
+    if(state.live&&state.hls.latency!=null&&!isNaN(state.hls.latency)) v.lat=state.hls.latency;
+  }catch(e){} }
+  if(state.dash){ try{
+    const dm=state.dash.getDashMetrics?state.dash.getDashMetrics():null;
+    if(dm&&dm.getCurrentDVRInfo){ const dvr=dm.getCurrentDVRInfo(); if(dvr&&dvr.range) v.dvr=Math.round(dvr.range.duration); }
+    if(state.dash.getAverageThroughput){ const th=state.dash.getAverageThroughput('video'); if(th) v.bw=th/1000; }
+  }catch(e){} }
+  if(state.flvInfo){ v.cod=(state.flvInfo.videoCodec||'?')+' + '+(state.flvInfo.audioCodec||'?'); }
+  if(state.whepPc){
+    const wv=state.whepView;
+    if(wv){ Object.assign(v,{rtt:wv.rtt,lost:wv.lost,jit:wv.jit,fps:wv.fps,cod:wv.codec}); if(wv.res) v.res=wv.res; }
+  }
+  if(!v.mbr&&v.lastBwK) v.mbr=v.lastBwK;
+  state.lastVt=v;
+  setCell('res',v.res); setCell('mbr',v.mbr!=null?(v.mbr>=1000?(v.mbr/1000).toFixed(2):Math.round(v.mbr)):null,v.mbr!=null?(v.mbr>=1000?'Mbps':'kbps'):null);
+  setCell('bw',v.bw!=null?Math.round(v.bw):null,'kbps'); setCell('buf',v.buf!=null?v.buf.toFixed(1):null,'s');
+  setCell('drop',v.drop); setCell('lvl',v.lvlTxt); setCell('lat',v.lat!=null?v.lat.toFixed(1):null,'s');
+  setCell('dvr',v.dvr); setCell('cod',v.cod); setCell('rtt',v.rtt!=null?Math.round(v.rtt):null,'ms');
+  setCell('lost',v.lost); setCell('jit',v.jit!=null?(v.jit*1000).toFixed(1):null,'ms'); setCell('fps',v.fps); setCell('rate',v.rate,'×');
+  renderChipStats(v);
+  const br=v.mbr||0; state.sparkB.push(br); if(state.sparkB.length>120) state.sparkB.shift();
+  state.sparkBuf.push(v.buf||0); if(state.sparkBuf.length>120) state.sparkBuf.shift();
+  drawSpark($('sparkBitrate'),state.sparkB,'#22d3ee'); drawSpark($('sparkBuffer'),state.sparkBuf,'#a78bfa');
+  $('spBrNow').textContent=v.mbr?fmtKbps(v.mbr):'—'; $('spBufNow').textContent=v.buf!=null?v.buf.toFixed(1)+' s':'—';
+  drawBufferBar();
+  if(state.whepPc) collectWhepStats();
+}
+async function collectWhepStats(){
+  try{
+    const st=await state.whepPc.getStats();
+    let bytes=null,lost=0,jit=null,rtt=null,frames=0,dropped=0,w=0,h=0,fps=null,codec='';
+    const codecs={};
+    st.forEach(r=>{
+      if(r.type==='codec') codecs[r.id]=r.mimeType?r.mimeType.replace('video/','').replace('audio/','a:'):r.clockRate;
+      else if(r.type==='inbound-rtp'&&r.kind==='video'){
+        bytes=(bytes||0)+(r.bytesReceived||0);
+        lost+=(r.packetsLost||0); frames+=(r.framesDecoded||0); dropped+=(r.framesDropped||0);
+        if(r.frameWidth) w=r.frameWidth; if(r.frameHeight) h=r.frameHeight;
+        if(r.framesPerSecond) fps=Math.round(r.framesPerSecond);
+        if(r.jitter) jit=r.jitter;
+        if(r.codecId&&codecs[r.codecId]) codec=codecs[r.codecId];
+      }
+      else if(r.type==='candidate-pair'&&r.state==='succeeded'&&r.nominated&&r.currentRoundTripTime!=null) rtt=r.currentRoundTripTime*1000;
+      else if(r.type==='candidate-pair'&&r.state==='succeeded'&&rtt==null&&r.currentRoundTripTime!=null) rtt=r.currentRoundTripTime*1000;
+    });
+    const now=performance.now(), prev=state.whepStats;
+    if(bytes!=null){
+      if(prev.bytes!=null&&now-prev.t>200){ const bps=(bytes-prev.bytes)*8/((now-prev.t)/1000); state.measuring.ema=state.measuring.ema?state.measuring.ema*0.6+bps*0.4:bps; }
+      state.whepStats={bytes,t:now};
+    }
+    state.whepView={lost,jit,rtt,frames,dropped,fps,codec,res:w?w+'×'+h:null};
+  }catch(e){}
+}
+
+/* ============ error reference DB ============ */
+const ERR_DB=[
+{cat:'hls',code:'manifestLoadError',sev:'high',
+ en:{c:'Playlist (m3u8) fetch failed — 404/403/5xx, DNS failure, mixed content, or CORS blocked the response.',f:'Replay the URL in DevTools → Network, or `curl -I <url>`. If CORS: add Access-Control-Allow-Origin on the manifest server/CDN. If 403: check referer/UA/token hotlink protection. If mixed content: serve over HTTPS.'},
+ zh:{c:'m3u8 拉取失败 — 404/403/5xx、DNS 解析失败、混合内容或 CORS 拦截。',f:'在 DevTools → Network 重放该 URL 或用 `curl -I <url>` 验证。CORS 问题需在清单服务器/CDN 加 Access-Control-Allow-Origin;403 检查 Referer/UA/防盗链 token;混合内容需改用 HTTPS。'}},
+{cat:'hls',code:'manifestLoadTimeout',sev:'med',
+ en:{c:'Manifest request timed out — server slow, network path blocked, or firewall dropping the connection.',f:'Check server response time and any regional firewall/ACL. Raise hls.js manifestLoadingTimeOut only if the origin is genuinely slow.'},
+ zh:{c:'清单请求超时 — 服务器响应慢、链路被墙或防火墙丢包。',f:'检查服务器响应时间与防火墙/ACL 规则;若源站确实慢,可调大 hls.js 的 manifestLoadingTimeOut。'}},
+{cat:'hls',code:'manifestParsingError',sev:'high',
+ en:{c:'Response is not valid M3U8 — often an HTML error page (404 page, login page, WAF challenge) returned with 200.',f:'View the manifest tab: if you see HTML, fix the origin (auth/WAF/routing). Ensure Content-Type is application/vnd.apple.mpegurl or audio/mpegurl.'},
+ zh:{c:'响应不是合法的 M3U8 — 通常是 200 状态码下返回了 HTML(错误页/登录页/WAF 挑战页)。',f:'打开清单页查看:若内容是 HTML,请修复源站(鉴权/WAF/路由);Content-Type 应为 application/vnd.apple.mpegurl 或 audio/mpegurl。'}},
+{cat:'hls',code:'manifestIncompatibleCodecsError',sev:'high',
+ en:{c:'No variant has codecs playable in this browser via MSE (e.g. HEVC/H.265, AC-3 on Chrome/Firefox).',f:'Transcode to H.264 + AAC for maximum compatibility, or play in Safari for HEVC. Check the CODECS attribute of EXT-X-STREAM-INF.'},
+ zh:{c:'所有清晰度的编码浏览器 MSE 都不支持(如 Chrome/Firefox 上的 HEVC/H.265、AC-3)。',f:'为最大兼容性转码为 H.264 + AAC;HEVC 请用 Safari 播放;检查 EXT-X-STREAM-INF 的 CODECS 属性。'}},
+{cat:'hls',code:'levelEmptyError',sev:'med',
+ en:{c:'Variant playlist contains no segments — encoder/packager stopped or the playlist is being rewritten empty.',f:'Check the transcoder/packager logs and confirm segments are being written to storage.'},
+ zh:{c:'子清单没有任何分片 — 编码器/打包器停了,或清单被清空重写。',f:'检查转码/打包服务日志,确认分片正在持续写入。'}},
+{cat:'hls',code:'levelLoadError',sev:'high',
+ en:{c:'Variant playlist fetch failed — same causes as manifestLoadError but on the child playlist.',f:'Verify the resolved child playlist URL (base path / URL rewriting) and its CORS headers.'},
+ zh:{c:'子清单拉取失败 — 原因同 manifestLoadError,只是发生在子清单上。',f:'核对子清单的最终 URL(基准路径/改写)及其 CORS 头。'}},
+{cat:'hls',code:'levelLoadTimeout',sev:'med',
+ en:{c:'Variant playlist request timed out.',f:'Check CDN origin performance; increase levelLoadingTimeOut if needed.'},
+ zh:{c:'子清单请求超时。',f:'检查 CDN 回源性能;必要时调大 levelLoadingTimeOut。'}},
+{cat:'hls',code:'fragLoadError',sev:'high',
+ en:{c:'Segment fetch failed — 404 (already rolled off live window), 403 (expired token), CORS, or slow origin.',f:'For live: increase playlist window / retry window. For tokens: check token TTL vs segment age. Verify segment CORS + range request support.'},
+ zh:{c:'分片拉取失败 — 404(已滑出直播窗口)、403(token 过期)、CORS 或源站过慢。',f:'直播场景加大清单窗口/重试窗口;防盗链 token 的有效期需大于分片寿命;确认分片支持 CORS 与 Range 请求。'}},
+{cat:'hls',code:'keyLoadError',sev:'high',
+ en:{c:'AES-128 decryption key request failed — key server blocks CORS, requires cookies, or the key URI is wrong.',f:'The key URL must send Access-Control-Allow-Origin and be reachable from the browser. Check EXT-X-KEY URI and IV correctness.'},
+ zh:{c:'AES-128 解密密钥请求失败 — 密钥服务器未开 CORS、要求 Cookie,或密钥 URI 错误。',f:'密钥 URL 必须返回 Access-Control-Allow-Origin 且浏览器可达;检查 EXT-X-KEY 的 URI 与 IV 是否正确。'}},
+{cat:'hls',code:'fragParsingError',sev:'med',
+ en:{c:'Demuxer failed on segment data — corrupted/truncated segment or non-monotonic timestamps.',f:'Check encoder output (timestamps, GOP) and CDN truncation. Enable PTS shift handling upstream.'},
+ zh:{c:'解复用器解析分片失败 — 分片损坏/被截断,或时间戳不单调。',f:'检查编码器输出(时间戳、GOP)与 CDN 是否截断文件;上游处理 PTS 漂移。'}},
+{cat:'hls',code:'bufferStalledError',sev:'med',
+ en:{c:'Playback stalled — network throughput below the variant bitrate, or the live origin stopped producing segments.',f:'Watch the Metrics tab: if measured bitrate ≈ variant bitrate, bandwidth-bound — drop level or raise CDN capacity; if segments stop arriving, check the encoder.'},
+ zh:{c:'播放卡顿 — 网络吞吐低于当前清晰度码率,或直播源停止产出分片。',f:'看指标页:若实测码率≈清晰度码率,是带宽不足(降清晰度或扩 CDN);若分片停止到达,查推流/编码端。'}},
+{cat:'hls',code:'bufferFullError',sev:'low',
+ en:{c:'Append buffer is full — usually benign (fast network, big buffer setting).',f:'Lower maxBufferLength or ignore; playback continues once buffered data is consumed.'},
+ zh:{c:'追加缓冲区已满 — 一般无害(网络快 + 缓冲设置大)。',f:'调低 maxBufferLength 或忽略,待缓冲消耗后自动恢复。'}},
+{cat:'hls',code:'bufferSeekOverHole',sev:'low',
+ en:{c:'Seek landed in a gap in the buffered ranges (discontinuities in the stream).',f:'Reduce discontinuities at the packager; hls.js nudges playback automatically.'},
+ zh:{c:'跳转落在缓冲空洞上(流中存在 discontinuity)。',f:'在打包端减少 discontinuity;hls.js 会自动微调播放位置。'}},
+{cat:'hls',code:'bufferAddCodecError',sev:'high',
+ en:{c:'MSE refused the codec string — unsupported codec/profile (e.g. H.265 on Chrome, 2-fps oddities).',f:'Check CODECS attributes; transcode to supported profiles (H.264 High@≤5.1, AAC-LC).'},
+ zh:{c:'MSE 拒绝该编码串 — 编码/Profile 不被支持(如 Chrome 上的 H.265)。',f:'检查 CODECS 属性;转码为受支持的 Profile(H.264 High@≤5.1、AAC-LC)。'}},
+{cat:'hls',code:'otherError',sev:'low',
+ en:{c:'Unclassified hls.js error.',f:'Check the Logs tab for the full event trail and open the engine issue if reproducible.'},
+ zh:{c:'未分类的 hls.js 错误。',f:'查看日志页的完整事件链;可复现时向引擎仓库提 issue。'}},
+{cat:'flv',code:'LoadingInterruptedError',sev:'high',
+ en:{c:'HTTP-FLV connection closed mid-stream — server/LB idle timeout, proxy buffering, or origin restart.',f:'Disable proxy buffering (X-Accel-Buffering: no), raise LB idle timeout beyond chunk interval, enable early-EOF recovery.'},
+ zh:{c:'HTTP-FLV 连接中断 — 服务器/负载均衡空闲超时、代理缓冲或源站重启。',f:'关闭代理缓冲(如 X-Accel-Buffering: no),调大 LB 空闲超时,开启 early-EOF 自动恢复。'}},
+{cat:'flv',code:'403',sev:'high',
+ en:{c:'HTTP 403 on the FLV stream — hotlink protection, signed URL expired, or ACL.',f:'Check Referer/UA allowlists and token expiry; browsers send Referer while VLC/ffplay do not.'},
+ zh:{c:'FLV 流返回 403 — 防盗链、签名 URL 过期或 ACL 拦截。',f:'检查 Referer/UA 白名单与 token 有效期;浏览器会带 Referer 而 VLC/ffplay 不会。'}},
+{cat:'flv',code:'404',sev:'high',
+ en:{c:'Stream not found — the publish side is offline or the app/stream name mismatches.',f:'Verify the stream is being pushed: check {app}/{stream} spelling and that the publisher is connected (OBS/SRS console).'},
+ zh:{c:'流不存在 — 推流端未推或 app/stream 名称不匹配。',f:'确认推流端在线:核对 {app}/{stream} 拼写与推流会话(OBS/SRS 控制台)。'}},
+{cat:'flv',code:'ConnectionRefused',sev:'high',
+ en:{c:'TCP connect refused — wrong port, service down, or firewall.',f:'curl -v the FLV URL from the same network; check the HTTP-FLV port (SRS 8080 / nginx-http-flv 8000 by default).'},
+ zh:{c:'TCP 连接被拒 — 端口错误、服务未启动或防火墙拦截。',f:'在同一网络用 `curl -v` 验证 FLV 地址;检查 HTTP-FLV 端口(SRS 默认 8080 / nginx-http-flv 默认 8000)。'}},
+{cat:'flv',code:'LoadingTimeOut',sev:'med',
+ en:{c:'No data arrived in time — origin not sending, or network path blocked.',f:'Confirm the stream has subscribers/data; test with ffplay on the same URL first.'},
+ zh:{c:'超时未收到数据 — 源站没有发流或链路不通。',f:'确认流有数据;先用 ffplay 拉同一地址对比。'}},
+{cat:'flv',code:'FormatError',sev:'high',
+ en:{c:'Not valid FLV/TS or unsupported codec — H.265-in-FLV needs enhanced-FLV support; browsers lack HEVC.',f:'Verify the payload with ffprobe. Transcode to H.264+AAC, or use a gateway that re-packages to HLS/fMP4.'},
+ zh:{c:'不是合法的 FLV/TS 或编码不支持 — FLV 中的 H.265 需增强 FLV 支持,浏览器普遍无 HEVC。',f:'用 ffprobe 验证流内容;转码 H.264+AAC,或用网关转封装为 HLS/fMP4。'}},
+{cat:'dash',code:'download',sev:'med',
+ en:{c:'Segment/manifest download error in dash.js — network, CORS or expired URL.',f:'Check Network panel for the failing request; ensure CDN CORS headers and URL validity.'},
+ zh:{c:'dash.js 分片/清单下载失败 — 网络、CORS 或 URL 过期。',f:'在 Network 面板定位失败请求;检查 CDN 的 CORS 头与 URL 有效性。'}},
+{cat:'dash',code:'manifesterror',sev:'high',
+ en:{c:'MPD parsing/validation failed — malformed XML or unsupported manifest features.',f:'Validate the MPD (e.g. with DASH-IF validators); check the Manifest tab for the raw XML.'},
+ zh:{c:'MPD 解析/校验失败 — XML 格式错误或使用了不支持的清单特性。',f:'用 DASH-IF 校验工具验证 MPD;在清单页查看原始 XML。'}},
+{cat:'dash',code:'capability',sev:'high',
+ en:{c:'No representation matches the device capabilities (codec/profile).',f:'Check Representation codecs against browser support (H.264/AAC safest).'},
+ zh:{c:'没有任何 Representation 匹配设备能力(编码/Profile 不支持)。',f:'对照浏览器支持情况检查各 Representation 的 codecs(H.264/AAC 最稳)。'}},
+{cat:'dash',code:'mediasource',sev:'high',
+ en:{c:'MSE/MediaSource error while appending — codec mismatch or buffer corruption.',f:'Match codecs between manifest and content; reset the player and retry.'},
+ zh:{c:'MSE 追加数据出错 — 编码不匹配或缓冲损坏。',f:'核对清单与实际内容的编码一致;重置播放器重试。'}},
+{cat:'dash',code:'drm',sev:'high',
+ en:{c:'DRM-protected content cannot play without a license server / EME support.',f:'This tool plays DRM-free streams; use a CDM-enabled client (Shaka Player, native players) for Widevine/PlayReady.'},
+ zh:{c:'受 DRM 保护的内容没有许可证服务器/EME 支持无法播放。',f:'本工具播放无 DRM 流;Widevine/PlayReady 请使用支持 CDM 的客户端(如 Shaka Player)。'}},
+{cat:'whep',code:'whep-http',sev:'high',
+ en:{c:'WHEP endpoint returned a non-201 response — 401/403 auth, 404 no such stream, 400 bad SDP, or CORS blocking the POST.',f:'Check the endpoint accepts POST application/sdp with CORS (Access-Control-Allow-Origin + POST method). Verify the stream exists and auth tokens are valid.'},
+ zh:{c:'WHEP 端点返回非 201 — 401/403 鉴权失败、404 流不存在、400 SDP 非法,或 CORS 拦截了 POST。',f:'确认端点支持 POST application/sdp 且带 CORS(Access-Control-Allow-Origin + POST);核对流是否存在、token 是否有效。'}},
+{cat:'whep',code:'ice-failed',sev:'high',
+ en:{c:'ICE negotiation failed — UDP blocked by firewall/NAT, or STUN/TURN unreachable.',f:'Allow UDP inbound; add a TURN server (turn:host) to ICE servers; test on a network without symmetric-NAT UDP blocks.'},
+ zh:{c:'ICE 协商失败 — 防火墙/NAT 拦截 UDP,或 STUN/TURN 不可达。',f:'放行 UDP;在 ICE 服务器中加入 TURN(turn:host);在对称 NAT 严格的网络下先做连通性测试。'}},
+{cat:'whep',code:'whep-nomedia',sev:'med',
+ en:{c:'Connected but no frames — publisher offline, audio-only stream, or track muted.',f:'Check the publisher side; inspect inbound-rtp in the Metrics tab (framesDecoded must grow).'},
+ zh:{c:'已连接但无画面 — 推流端离线、纯音频流或 track 被静音。',f:'检查推流端;在指标页观察 inbound-rtp(framesDecoded 应持续增长)。'}},
+{cat:'native',code:'MEDIA_ERR_NETWORK',sev:'med',
+ en:{c:'Native fetch interrupted while downloading progressive media.',f:'Retry; check server/network stability and Range request support.'},
+ zh:{c:'原生下载渐进式媒体时网络中断。',f:'重试;检查服务器/网络稳定性与 Range 请求支持。'}},
+{cat:'native',code:'MEDIA_ERR_DECODE',sev:'high',
+ en:{c:'Media decoded failed — corrupted file or unsupported profile.',f:'Verify with ffprobe; re-encode to standard profiles.'},
+ zh:{c:'解码失败 — 文件损坏或 Profile 不支持。',f:'用 ffprobe 验证;重新编码为标准 Profile。'}},
+{cat:'native',code:'MEDIA_ERR_SRC_NOT_SUPPORTED',sev:'high',
+ en:{c:'Browser cannot play this container/codec natively.',f:'Check codec support (e.g. H.265/AC3 unsupported in Chrome); use the matching engine (HLS→hls.js, FLV→mpegts.js).'},
+ zh:{c:'浏览器原生不支持该容器/编码。',f:'检查编码支持(如 Chrome 不支持 H.265/AC3);换用对应引擎(HLS→hls.js,FLV→mpegts.js)。'}},
+{cat:'browser',code:'mixed-content',sev:'high',
+ en:{c:'HTTPS page cannot fetch http:// media — the browser blocks it before any request is sent.',f:'Serve the stream over HTTPS (or reverse-proxy it through your HTTPS origin with SNI).'},
+ zh:{c:'HTTPS 页面无法拉取 http:// 流 — 浏览器在请求发出前直接拦截。',f:'为流开启 HTTPS,或通过你的 HTTPS 源站反向代理回源。'}},
+{cat:'browser',code:'cors',sev:'high',
+ en:{c:'CORS: the fetch succeeded at network level but the server did not answer Access-Control-Allow-Origin for this origin.',f:'Add the header on manifest+segments+keys: nginx `add_header Access-Control-Allow-Origin *;` / SRS http_server `cors *` / CDN CORS rules. Note: <video> native playback does not need CORS, MSE-based engines do.'},
+ zh:{c:'CORS:网络层请求成功,但服务端没有对本 origin 返回 Access-Control-Allow-Origin。',f:'在清单+分片+密钥上都加该头:nginx `add_header Access-Control-Allow-Origin *;` / SRS http_server `cors *` / CDN 配置 CORS 规则。注意:原生 <video> 不需要 CORS,但 MSE 引擎需要。'}},
+{cat:'browser',code:'autoplay',sev:'med',
+ en:{c:'Autoplay with sound was blocked by browser policy.',f:'Click the player once, or start the stream muted (Stream Inspector retries muted automatically).'},
+ zh:{c:'浏览器策略阻止了带声音的自动播放。',f:'点击一次播放器,或以静音启动(本工具会自动降级为静音重试)。'}},
+{cat:'browser',code:'mse-missing',sev:'high',
+ en:{c:'MediaSource Extensions unavailable — iOS Safari has no MSE, so FLV/DASH cannot play there at all.',f:'Use HLS on iOS (native or hls.js fallback), or a WHEP client.'},
+ zh:{c:'浏览器没有 MediaSource Extensions — iOS Safari 无 MSE,FLV/DASH 在 iOS 上完全无法播放。',f:'iOS 使用 HLS(原生或 hls.js 回退),或改用 WHEP 客户端。'}},
+{cat:'browser',code:'hotlink-403',sev:'med',
+ en:{c:'Plays in VLC but 403 in browsers — Referer/UA-based hotlink protection.',f:'Allowlist your page origin or empty Referer; note signed URLs must match the exact fetch time window.'},
+ zh:{c:'VLC 能播但浏览器 403 — 基于 Referer/UA 的防盗链。',f:'将页面 origin 加入白名单或放行空 Referer;注意签名 URL 的时间窗口要与实际请求时间匹配。'}},
+];
+function renderErrFilters(){
+  const cats=[['all',t('efAll')],['hls','HLS'],['flv','FLV/TS'],['dash','DASH'],['whep','WebRTC'],['native',t('efNative')],['browser',t('efBrowser')]];
+  $('errFilters').innerHTML=cats.map(([k,l],i)=>`<button class="ef-chip${i===0?' active':''}" data-cat="${k}">${l}</button>`).join('');
+  $('errFilters').querySelectorAll('.ef-chip').forEach(b=>b.onclick=()=>{
+    $('errFilters').querySelectorAll('.ef-chip').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); renderErrTable(b.getAttribute('data-cat'));
+  });
+}
+function renderErrTable(cat='all'){
+  const rows=ERR_DB.filter(r=>cat==='all'||r.cat===cat);
+  let html=`<thead><tr><th>${t('errCode')}</th><th>${t('errSev')}</th><th>${t('errCause')}</th><th>${t('errFix')}</th></tr></thead><tbody>`;
+  rows.forEach(r=>{
+    const L=LANG==='zh'?r.zh:r.en;
+    html+=`<tr data-code="${esc(r.code)}"><td><code>${esc(r.code)}</code><div style="color:var(--faint);font-size:10.5px;margin-top:2px">${r.cat.toUpperCase()}</div></td>
+      <td><span class="sev ${r.sev}">${r.sev==='high'?'HIGH':r.sev==='med'?'MED':'LOW'}</span></td>
+      <td><div class="cause">${esc(L.c)}</div></td><td><div class="cause">${esc(L.f)}</div></td></tr>`;
+  });
+  $('errTable').innerHTML=html+'</tbody>';
+}
+/* ============ comparison table ============ */
+const CMP=[
+ ['HLS','6–30 s','HTTP segments (TCP)','All — hls.js (MSE) or native in Safari','VOD & large-scale live, CDN friendly','点播与大规模直播,CDN 友好'],
+ ['LL-HLS','2–5 s','HTTP parts / byte-range','All — hls.js lowLatencyMode / Safari','Interactive live broadcast','互动直播'],
+ ['HTTP-FLV','1–3 s','HTTP chunked FLV','Chrome/Edge/Firefox — mpegts.js (no iOS Safari)','Low-latency live behind nginx/SRS','nginx/SRS 体系下的低延迟直播'],
+ ['MPEG-TS','1–3 s','HTTP chunked TS','Chrome/Edge/Firefox — mpegts.js','Broadcast contribution streams','广电级码流转发'],
+ ['DASH','6–30 s','HTTP segments','All major — dash.js','VOD, multi-DRM ecosystems','点播与多 DRM 生态'],
+ ['WebRTC (WHEP)','< 1 s','RTP/SRTP + ICE (UDP)','All modern browsers','Ultra-low-latency interactive','超低延迟互动场景'],
+ ['RTMP','1–3 s','TCP :1935','✗ browsers cannot pull — assist only','Ingest from OBS/encoders; convert at edge','OBS/编码器推流入口,边缘转协议后播放'],
+ ['RTSP','0.5–2 s','RTP over TCP/UDP','✗ needs ffplay/VLC','IP cameras, NVR, embedded','IP 摄像头、NVR、嵌入式设备'],
+ ['SRT','0.5–3 s','UDP + ARQ/FEC','✗ needs gateway','Unstable/lossy network contribution','弱网/跨公网传输'],
+];
+const CMP_ZH={
+ 'HLS':['HTTP 分片 (TCP)','全平台 — hls.js(MSE)或 Safari 原生','点播与大规模直播,CDN 友好'],
+ 'LL-HLS':['HTTP parts / 字节范围','全平台 — hls.js 低延迟模式 / Safari','互动直播'],
+ 'HTTP-FLV':['HTTP chunked FLV','Chrome/Edge/Firefox — mpegts.js(iOS Safari 不支持)','nginx/SRS 体系下的低延迟直播'],
+ 'MPEG-TS':['HTTP chunked TS','Chrome/Edge/Firefox — mpegts.js','广电级码流转发'],
+ 'DASH':['HTTP 分片','主流浏览器 — dash.js','点播与多 DRM 生态'],
+ 'WebRTC (WHEP)':['RTP/SRTP + ICE (UDP)','所有现代浏览器','超低延迟互动场景'],
+ 'RTMP':['TCP :1935','✗ 浏览器无法直接拉流 — 仅辅助','OBS/编码器推流入口,边缘转协议后播放'],
+ 'RTSP':['RTP over TCP/UDP','✗ 需 ffplay/VLC','IP 摄像头、NVR、嵌入式设备'],
+ 'SRT':['UDP + ARQ/FEC','✗ 需网关转换','弱网/跨公网传输'],
+};
+function renderCmp(){
+  const head=`<thead><tr><th>${t('cmpProto')}</th><th>${t('cmpLat')}</th><th>${t('cmpTrans')}</th><th>${t('cmpBrowser')}</th><th>${t('cmpUse')}</th></tr></thead><tbody>`;
+  const body=CMP.map(r=>{ const zh=CMP_ZH[r[0]]||[r[2],r[3],r[4]];
+    return `<tr><td class="mono">${r[0]}</td><td class="num">${r[1]}</td><td>${esc(LANG==='zh'?zh[0]:r[2])}</td><td>${esc(LANG==='zh'?zh[1]:r[3])}</td><td>${esc(LANG==='zh'?zh[2]:r[4])}</td></tr>`; }).join('');
+  $('cmpTable').innerHTML=head+body+'</tbody>';
+}
+/* ============ report ============ */
+function buildReport(){
+  const L=[];
+  L.push('Stream Inspector — debug report');
+  L.push('URL: '+state.url);
+  L.push('Format: '+state.fmt+' · Engine: '+(state.engineType||'—')+' · Type: '+(state.live?'LIVE':'VOD/unknown'));
+  L.push('Time: '+new Date().toLocaleString());
+  if(state.pfTexts&&state.pfTexts.length){ L.push(''); L.push('Pre-flight:'); state.pfTexts.forEach(x=>L.push('  '+x)); }
+  const vt=state.lastVt||{};
+  L.push(''); L.push(`Metrics: res=${vt.res||'—'} bitrate=${vt.mbr?Math.round(vt.mbr)+'kbps':'—'} buffer=${vt.buf!=null?vt.buf.toFixed(1)+'s':'—'} dropped=${vt.drop??'—'}`);
+  const errs=state.log.filter(l=>l.lvl==='err').slice(-8);
+  if(errs.length){ L.push(''); L.push('Last errors:'); errs.forEach(e=>L.push(`  [${e.ts}] ${e.tag} ${e.msg}`)); }
+  L.push(''); L.push('— generated by https://tliens.github.io/stream-inspector/');
+  return L.join('\n');
+}
+
+/* ============ tabs & boot ============ */
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.pane===name));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='pane-'+name));
+  if(name==='metrics'){ drawSpark($('sparkBitrate'),state.sparkB,'#22d3ee'); drawSpark($('sparkBuffer'),state.sparkBuf,'#a78bfa'); drawBufferBar(); }
+}
+function applyLang(){
+  document.documentElement.lang=LANG;
+  $('langBtn').textContent=LANG==='en'?'中文':'EN';
+  document.title=I18N[LANG].title;
+  document.querySelector('meta[name="description"]').setAttribute('content',I18N[LANG].desc);
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=t(el.getAttribute('data-i18n')); });
+  renderErrFilters(); renderErrTable($('errFilters').querySelector('.active')?$('errFilters').querySelector('.active').dataset.cat:'all');
+  renderCmp(); renderHistory();
+  if(state.fmt&&!FMT_META[state.fmt].playable&&state.url) renderNpAssist(state.fmt,state.url);
+}
+$('langBtn').onclick=()=>{
+  LANG=LANG==='en'?'zh':'en';
+  try{ localStorage.setItem('si_lang',LANG); }catch(e){}
+  const q=new URLSearchParams(location.search);
+  if(LANG==='en') q.delete('lang'); else q.set('lang','zh');
+  history.replaceState(null,'',location.pathname+(q.toString()?'?'+q.toString():'')+location.hash);
+  applyLang();
+};
+$('themeBtn').onclick=()=>{
+  const cur=document.documentElement.getAttribute('data-theme');
+  const next=cur==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  try{ localStorage.setItem('si_theme',next); }catch(e){}
+  drawSpark($('sparkBitrate'),state.sparkB,'#22d3ee'); drawSpark($('sparkBuffer'),state.sparkBuf,'#a78bfa');
+};
+document.querySelectorAll('.tab-btn').forEach(b=>b.onclick=()=>switchTab(b.dataset.pane));
+$('playBtn').onclick=()=>startPlay();
+$('stopBtn').onclick=()=>{ stopAll(false); log('APP','stopped by user','info'); };
+$('reloadBtn').onclick=()=>{ if(state.url) startPlay(); };
+$('shareBtn').onclick=()=>doShare();
+$('clearBtn').onclick=()=>{ $('urlInput').value=''; updateBadge(); $('urlInput').focus(); };
+$('recheckBtn').onclick=async()=>{ const u=$('urlInput').value.trim(); if(!u){ toast(t('noUrl')); return; } state.pfTexts=[]; await preflight(effectiveFormat(),u); };
+$('copyReportBtn').onclick=async()=>{ await copyText(buildReport()); toast(t('copied')); };
+$('mfCopy').onclick=async()=>{ if(!state.rawManifest) return; await copyText(state.rawManifest); toast(t('copied')); };
+$('histClear').onclick=()=>{ saveHist([]); renderHistory(); };
+['lgInfo','lgOk','lgWarn','lgErr'].forEach(id=>$(id).onchange=rerenderLogs);
+$('logFilter').oninput=rerenderLogs;
+$('logCopy').onclick=async()=>{ await copyText(state.log.map(e=>`[${e.ts}] ${e.lvl.toUpperCase()} ${e.tag} ${e.msg}`).join('\n')||'(empty)'); toast(t('copied')); };
+$('logDl').onclick=()=>{ const blob=new Blob([state.log.map(e=>`[${e.ts}] ${e.lvl.toUpperCase()} ${e.tag} ${e.msg}`).join('\n')||'(empty)'],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='stream-inspector-log.txt'; a.click(); URL.revokeObjectURL(a.href); };
+$('logClear').onclick=()=>{ state.log=[]; $('logCount').textContent='0'; $('logCount').classList.remove('bad'); rerenderLogs(); };
+$('urlInput').addEventListener('input',updateBadge);
+$('urlInput').addEventListener('keydown',e=>{ if(e.key==='Enter') startPlay(); });
+document.addEventListener('keydown',e=>{
+  if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){ e.preventDefault(); $('urlInput').focus(); $('urlInput').select(); }
+});
+document.querySelectorAll('[data-demo]').forEach((chip,i)=>{ chip.onclick=()=>{ const d=DEMOS[i]; if(!d) return; $('urlInput').value=d.url; $('formatSel').value='auto'; updateBadge(); startPlay(); }; });
+video.addEventListener('playing',()=>{ setSummary('Status','playing'); log('VIDEO','playing','ok'); });
+video.addEventListener('canplay',()=>{ if(state.playing&&video.paused) video.play().catch(()=>{}); });
+video.addEventListener('waiting',()=>log('VIDEO','buffering…','warn'));
+video.addEventListener('stalled',()=>log('VIDEO','stalled','warn'));
+video.addEventListener('pause',()=>{ if(state.playing) log('VIDEO','paused','info'); });
+window.addEventListener('resize',()=>{ drawSpark($('sparkBitrate'),state.sparkB,'#22d3ee'); drawSpark($('sparkBuffer'),state.sparkBuf,'#a78bfa'); });
+function initFromParams(){
+  const q=new URLSearchParams(location.search);
+  const s=q.get('s');
+  if(s){ try{ const d=JSON.parse(b64urlDecode(s)); if(d.u){ $('urlInput').value=d.u; if(d.f)$('formatSel').value=d.f; updateBadge(); startPlay(); return; } }catch(e){ log('APP','invalid share link payload','warn'); } }
+  const u=q.get('url');
+  if(u){ $('urlInput').value=u; if(q.get('format')) $('formatSel').value=q.get('format'); updateBadge(); startPlay(); }
+}
+applyLang(); updateBadge();
+initFromParams();
+
+
+</script>
+</body>
+</html>
