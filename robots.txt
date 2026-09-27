@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://tliens.github.io/stream-inspector/sitemap.xml
+Sitemap: https://stream-inspector.kuige.me/sitemap.xml
