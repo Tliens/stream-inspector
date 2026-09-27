@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stream Inspector — Online Live Stream Pull Debugger (HLS · HTTP-FLV · DASH · WebRTC)</title>
+<title>Stream Inspector — 流媒体调试工具箱 · Live Pull Debugger (HLS · HTTP-FLV · DASH · WebRTC) + Audio Analyzer</title>
 <meta name="description" content="Free online live-stream pull (playback) debugger for developers: play and diagnose HLS/m3u8, LL-HLS, HTTP-FLV, MPEG-TS, DASH and WebRTC WHEP streams. Playlist & MPD parser, real-time bitrate/buffer/dropped-frames metrics, event logs, CORS & mixed-content checks, RTMP/RTSP command-line assist. 100% local.">
 <link rel="canonical" href="https://stream-inspector.kuige.me/">
 <link rel="alternate" hreflang="en" href="https://stream-inspector.kuige.me/?lang=en">
@@ -269,6 +269,14 @@ footer{border-top:1px solid var(--border);margin-top:36px;padding:22px 0 34px;co
   #urlInput{width:100%;flex:none;order:3}
   .fmt-badge{order:1} #clearBtn{order:2;margin-left:auto}
 }
+
+/* ---- toolbox nav ---- */
+.toolbox{border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--bg) 88%,transparent)}
+.toolbox-in{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:9px;padding-bottom:9px}
+.tb-label{font-size:12.5px;font-weight:600;opacity:.62;margin-right:6px}
+.tb-tab{font-size:13px;padding:5px 14px;border-radius:999px;border:1px solid var(--border);color:var(--text);text-decoration:none;white-space:nowrap}
+.tb-tab:hover{border-color:var(--accent);text-decoration:none}
+.tb-tab.on{background:var(--accent);border-color:transparent;color:#fff}
 </style>
 </head>
 <body>
@@ -288,6 +296,15 @@ footer{border-top:1px solid var(--border);margin-top:36px;padding:22px 0 34px;co
     <button class="icon-btn" id="themeBtn" title="Toggle theme">◐</button>
   </div>
 </header>
+
+<nav class="toolbox" aria-label="streaming debug toolbox">
+  <div class="wrap toolbox-in">
+    <span class="tb-label">🧰 流媒体调试工具箱 · Streaming Toolbox</span>
+    <a class="tb-tab on" href="./">🎬 拉流调试 Stream Pull</a>
+    <a class="tb-tab" href="./audio.html">🎚 音频分析 Audio</a>
+  </div>
+</nav>
+
 
 <main class="wrap">
   <section class="hero">

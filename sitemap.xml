@@ -4,4 +4,8 @@
     <xhtml:link rel="alternate" hreflang="zh" href="https://stream-inspector.kuige.me/?lang=zh"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://stream-inspector.kuige.me/?lang=en"/>
   </url>
+  <url><loc>https://stream-inspector.kuige.me/audio.html</loc><changefreq>weekly</changefreq><priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://stream-inspector.kuige.me/audio.html?lang=zh"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://stream-inspector.kuige.me/audio.html"/>
+  </url>
 </urlset>
