@@ -9,7 +9,8 @@
 <link rel="alternate" hreflang="en" href="https://stream-inspector.kuige.me/?lang=en">
 <link rel="alternate" hreflang="zh" href="https://stream-inspector.kuige.me/?lang=zh">
 <link rel="alternate" hreflang="x-default" href="https://stream-inspector.kuige.me/">
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" href="favicon.png?v=2">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Stream Inspector">
@@ -84,15 +85,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);lin
 a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
 .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
 .hidden{display:none!important}
-/* header */
-header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
-.header-inner{display:flex;align-items:center;gap:14px;height:58px}
-.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:17px;color:var(--text)}
-.brand:hover{text-decoration:none}
-.brand svg{flex:none}
-.brand .beta{font-size:10px;font-weight:600;color:var(--accent);border:1px solid var(--accent);border-radius:99px;padding:0 7px;letter-spacing:.5px}
-.header-spacer{flex:1}
-.header-link{color:var(--muted);font-size:13.5px;display:flex;align-items:center;gap:5px}
+/* header buttons */
 .icon-btn{background:var(--chip);border:1px solid var(--border);color:var(--text);border-radius:9px;height:34px;min-width:34px;padding:0 10px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;justify-content:center}
 .icon-btn:hover{background:var(--hover);border-color:var(--border2)}
 /* hero */
@@ -257,17 +250,35 @@ ol.steps b{color:var(--text)}
 .faq-item .q{font-weight:700;font-size:14px;margin-bottom:5px}
 .faq-item .a{color:var(--muted);font-size:13.5px}
 /* footer */
-footer{border-top:1px solid var(--border);margin-top:36px;padding:22px 0 34px;color:var(--faint);font-size:12.5px}
-.foot-inner{display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between}
 /* toast */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--panel);border:1px solid var(--border2);color:var(--text);padding:10px 18px;border-radius:11px;font-size:13.5px;box-shadow:var(--shadow);transition:.25s;z-index:99;max-width:88vw}
 #toast.show{transform:translateX(-50%) translateY(0)}
+/* ── KuiGe 站群统一基座 ───────────────────── */
+:root{--kg-ink:#1f2430;--kg-sub:#6b7280;--kg-accent:#f2603c;--kg-line:#e8e6e1;--kg-bg:#faf9f7}
+.kg-top{position:sticky;top:0;z-index:60;background:rgba(250,249,247,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--kg-line)}
+.kg-top-in{max-width:1120px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.kg-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--kg-ink);font-weight:700;font-size:17px}
+.kg-brand img{width:32px;height:32px;border-radius:9px;display:block}
+.kg-brand small{font-weight:500;color:var(--kg-sub);font-size:12px}
+.kg-nav{display:flex;align-items:center;gap:14px;font-size:14px}
+.kg-nav a{color:var(--kg-sub);text-decoration:none}
+.kg-nav a:hover{color:var(--kg-ink)}
+.kg-entry{background:var(--kg-ink);color:#fff!important;padding:6px 14px;border-radius:999px;text-decoration:none;font-size:13px}
+.kg-entry:hover{background:var(--kg-accent)}
+.kg-foot{background:var(--kg-bg);border-top:1px solid var(--kg-line);color:var(--kg-sub);font-size:13px;margin-top:0}
+.kg-foot-in{max-width:1120px;margin:0 auto;padding:36px 20px 28px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.kg-foot img{width:44px;height:44px;border-radius:12px;margin-bottom:2px}
+.kg-foot-brand{color:var(--kg-ink);font-weight:700;font-size:15px;margin:0}
+.kg-foot-links{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px}
+.kg-foot-links a{color:var(--kg-sub);text-decoration:none}
+.kg-foot-links a:hover{color:var(--kg-accent)}
+.kg-foot-copy{margin:4px 0 0;color:#9ca3af;font-size:12px}
+@media(max-width:640px){.kg-nav a:not(.kg-entry){display:none}}
 @media (max-width:960px){
   .grid-main{grid-template-columns:1fr}
   .kbd-hint{display:none}
   .url-row{flex-wrap:wrap}
-  #urlInput{width:100%;flex:none;order:3}
-  .fmt-badge{order:1} #clearBtn{order:2;margin-left:auto}
+  #urlInput{width:100%;flex:none;order:3}  .fmt-badge{order:1} #clearBtn{order:2;margin-left:auto}
 }
 
 /* ---- toolbox nav ---- */
@@ -280,21 +291,22 @@ footer{border-top:1px solid var(--border);margin-top:36px;padding:22px 0 34px;co
 </style>
 </head>
 <body>
-<header>
-  <div class="wrap header-inner">
-    <a class="brand" href="./" aria-label="Stream Inspector home">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="1.5" y="4" width="21" height="16" rx="4" stroke="url(#g1)" stroke-width="2"/><circle cx="12" cy="12" r="3.4" fill="url(#g1)"/><path d="M12 8.6V12l2.4 1.4" stroke="#0a0e16" stroke-width="1.3" stroke-linecap="round"/><defs><linearGradient id="g1" x1="1.5" y1="4" x2="22.5" y2="20"><stop stop-color="#22d3ee"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs></svg>
-      Stream Inspector <span class="beta">BETA</span>
+<header class="kg-top">
+  <div class="kg-top-in">
+    <a class="kg-brand" href="./">
+      <img src="favicon.png?v=2" alt="Stream Inspector 吉祥物">
+      <span>Stream Inspector<small>直播拉流调试</small></span>
     </a>
-    <div class="header-spacer"></div>
-    <a class="header-link kuige-entry" href="https://kuige.me/" target="_blank" rel="noopener" title="kuige.me" style="text-decoration:none"><img src="https://kuige.me/logo.png" alt="" width="16" height="16" style="width:16px;height:16px;border-radius:50%;vertical-align:-3px;margin-right:6px">魁歌</a>
-<a class="header-link" href="#guide" data-i18n="navGuide">Guide</a>
-    <a class="header-link" href="https://x.com/kuige_me" target="_blank" rel="noopener" title="Follow on X (Twitter)">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-      X
-    </a>
-    <button class="icon-btn" id="langBtn" title="切换语言 / Switch language">中文</button>
-    <button class="icon-btn" id="themeBtn" title="Toggle theme">◐</button>
+    <nav class="kg-nav">
+      <a href="#guide" data-i18n="navGuide">Guide</a>
+      <a href="https://x.com/kuige_me" target="_blank" rel="noopener" title="Follow on X (Twitter)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        X
+      </a>
+      <button class="icon-btn" id="langBtn" title="切换语言 / Switch language">中文</button>
+      <button class="icon-btn" id="themeBtn" title="Toggle theme">◐</button>
+      <a class="kg-entry" href="https://kuige.me/" target="_blank" rel="noopener">魁歌 · 全部作品</a>
+    </nav>
   </div>
 </header>
 
@@ -510,14 +522,19 @@ footer{border-top:1px solid var(--border);margin-top:36px;padding:22px 0 34px;co
   </section>
 </main>
 
-<footer>
-  <div class="wrap foot-inner">
-    <span data-i18n="footPrivacy">🔒 100% client-side: URLs are fetched directly by your browser, nothing is proxied or stored server-side. History stays in localStorage.</span>
-    <span>
-      <a href="https://sse-inspector.kuige.me/" target="_blank" rel="noopener">SSE Inspector</a> ·
-      <a href="https://x.com/kuige_me" target="_blank" rel="noopener">X (Twitter)</a> ·
-      © 2026 魁歌 KuiGe
-    </span>
+<footer class="kg-foot">
+  <div class="kg-foot-in">
+    <img src="favicon.png?v=2" alt="Stream Inspector 吉祥物">
+    <p class="kg-foot-brand">Stream Inspector</p>
+    <nav class="kg-foot-links">
+      <a href="https://kuige.me/" target="_blank" rel="noopener">魁歌主页</a>
+      <a href="https://sse-inspector.kuige.me/" target="_blank" rel="noopener">SSE Inspector</a>
+      <a href="https://collagemill.kuige.me/" target="_blank" rel="noopener">CollageMill 图片排版</a>
+      <a href="https://indie-gems.kuige.me/" target="_blank" rel="noopener">Indie Gems 独立开发者项目</a>
+      <a href="https://x.com/kuige_me" target="_blank" rel="noopener">X (Twitter)</a>
+    </nav>
+    <p data-i18n="footPrivacy" style="margin:0;max-width:560px">🔒 100% client-side: URLs are fetched directly by your browser, nothing is proxied or stored server-side. History stays in localStorage.</p>
+    <p class="kg-foot-copy">© 2026 魁歌 KuiGe · 用 AI 构建 · <a href="https://kuige.me/" style="color:inherit">kuige.me</a></p>
   </div>
 </footer>
 
